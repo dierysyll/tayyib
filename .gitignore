@@ -3,4 +3,10 @@ __pycache__/
 *.pyc
 .DS_Store
 .env
+
+# Le cache de l'univers est reconstruit par refresh.py : il n'a rien à
+# faire dans le dépôt, et il périmerait de toute façon.
 cache/
+
+# Réglages locaux de l'outillage (propres à cette machine)
+.claude/settings.local.json
