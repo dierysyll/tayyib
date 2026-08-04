@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block titre %}Screener{% endblock %}
+
+{% macro lien(verdict) -%}
+?standard={{ standard.id }}{% if q %}&q={{ q }}{% endif %}{% if verdict %}&verdict={{ verdict }}{% endif %}
+{%- endmacro %}
+
+{% block contenu %}
+<main class="page">
+
+  <h1 class="titre-page">Le screener halal de la place de Paris</h1>
+  <p class="chapeau">
+    {{ total }} valeurs d'Euronext Paris passées au filtre {{ standard.full }}.
+    Chaque verdict affiche son calcul, sa source et sa date d'arrêté comptable.
+  </p>
+
+  <div class="compteurs">
+    <a class="compteur c-tous {% if not filtre %}on{% endif %}" href="{{ lien(none) }}">
+      <div class="compteur-nb num">{{ total }}</div>
+      <div class="compteur-lb">Valeurs suivies</div>
+    </a>
+    {% for v, libelle in [('conforme', 'Conformes'), ('a_verifier', 'À vérifier'), ('non_conforme', 'Non conformes')] %}
+      <a class="compteur c-{{ v }} {% if filtre == v %}on{% endif %}" href="{{ lien(v) }}">
+        <div class="compteur-nb num">{{ compteurs[v] }}</div>
+        <div class="compteur-lb">{{ libelle }}</div>
+      </a>
+    {% endfor %}
+  </div>
+
+  <div class="outils">
+    <form class="recherche" method="get" action="/">
+      <input type="search" name="q" value="{{ q }}" placeholder="Chercher une valeur — Air Liquide, TTE.PA…" autocomplete="off">
+      <input type="hidden" name="standard" value="{{ standard.id }}">
+      {% if filtre %}<input type="hidden" name="verdict" value="{{ filtre }}">{% endif %}
+    </form>
+    <div class="segments">
+      {% for sid, std in standards.items() %}
+        <a href="?standard={{ sid }}{% if q %}&q={{ q }}{% endif %}{% if filtre %}&verdict={{ filtre }}{% endif %}"
+           class="{% if sid == standard.id %}on{% endif %}">{{ std.label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="cadre">
+    {% if evaluees %}
+    <div class="defilement">
+      <table>
+        <thead>
+          <tr>
+            <th>Valeur</th>
+            <th>Secteur</th>
+            <th>Verdict {{ standard.label }}</th>
+            <th class="a-droite">Dette / {{ 'bilan' if standard.denominator == 'total_assets' else 'capi.' }}</th>
+            <th class="a-droite">Capitalisation</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in evaluees %}
+            {% set s = e.societe %}{% set r = e.resultat %}
+            {% set dette = r.ratios | selectattr('cle', 'equalto', 'debt') | first %}
+            <tr>
+              <td>
+                <a class="nom-valeur" href="/valeur/{{ s.ticker }}?standard={{ standard.id }}">{{ s.nom }}</a>
+                <div class="ticker num">{{ s.ticker }}</div>
+              </td>
+              <td class="secteur">{{ s.industry or s.sector or '—' }}</td>
+              <td><span class="verdict v-{{ r.verdict }}">{{ engine.VERDICT_LABELS[r.verdict] }}</span></td>
+              <td class="a-droite num">{{ (dette.valeur if dette else none) | pourcent }}</td>
+              <td class="a-droite num">{{ s.market_cap | montant }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="vide">
+        {% if q %}Aucune valeur ne correspond à « {{ q }} ».{% else %}
+        Le cache est vide. Lancez <code>python refresh.py</code> pour collecter les données.{% endif %}
+      </p>
+    {% endif %}
+  </div>
+
+  <div class="encart">
+    <p><strong>Ce que ce tableau ne dit pas.</strong>
+    Les trois standards exigent aussi que les revenus tirés d'activités non conformes
+    restent sous 5 % du chiffre d'affaires. Ce chiffre ne figure dans aucune source de
+    données de marché : il se lit dans le rapport annuel. Un verdict « conforme » ici
+    signifie donc <em>conforme sur les critères calculables</em>, et ce dernier filtre
+    reste à votre charge.</p>
+  </div>
+
+  {% if fetched_at %}
+    <p class="pied-liens">Données collectées le {{ fetched_at | date_fr }}. Les capitalisations évoluent en continu ; les bilans, une fois par exercice.</p>
+  {% endif %}
+
+</main>
+{% endblock %}

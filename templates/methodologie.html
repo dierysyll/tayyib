@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block titre %}Méthodologie{% endblock %}
+
+{% block contenu %}
+<main class="page prose">
+
+  <h1 class="titre-page">Méthodologie</h1>
+  <p class="chapeau">
+    Comment chaque verdict est produit, d'où viennent les chiffres, et ce que
+    cet outil ne sait pas faire.
+  </p>
+
+  <h2>Deux filtres, dans cet ordre</h2>
+  <p>
+    Le screening se fait en deux temps. D'abord <strong>l'activité</strong> : une
+    entreprise dont le métier est illicite l'est quel que soit son bilan. Ensuite
+    <strong>les ratios financiers</strong> : une entreprise au métier licite peut
+    être écartée si elle est trop endettée à intérêt.
+  </p>
+
+  <h3>1. Le filtre sectoriel</h3>
+  <p>Sont écartées sans examen des comptes les sociétés dont l'activité relève de :</p>
+  <ul>
+    <li>la <strong>banque, l'assurance et le crédit conventionnels</strong> — activité fondée sur l'intérêt (<em>riba</em>) et, pour l'assurance, sur l'aléa (<em>gharar</em>) ;</li>
+    <li>la <strong>production d'alcool</strong> et le <strong>tabac</strong> ;</li>
+    <li>les <strong>jeux d'argent</strong> (<em>maysir</em>) ;</li>
+    <li>le <strong>contenu pour adultes</strong>.</li>
+  </ul>
+  <p>
+    D'autres secteurs sont classés <strong>à vérifier</strong> plutôt qu'exclus, parce
+    que l'intitulé sectoriel ne suffit pas à trancher. C'est le cas de
+    <code>Aerospace &amp; Defense</code>, qui range sous une même étiquette l'aviation
+    civile et l'armement ; de la grande distribution, qui vend de l'alcool et du porc
+    sans que ce soit son métier ; de la restauration et de l'hôtellerie. Le
+    divertissement y figure aussi, non par ambiguïté de données mais parce que les
+    écoles divergent.
+  </p>
+
+  <h3>2. Les ratios financiers</h3>
+  <p>
+    Il n'existe pas un screening halal, mais plusieurs, qui ne retiennent ni les mêmes
+    seuils ni le même dénominateur. Une même société peut être conforme selon MSCI et
+    non conforme selon l'AAOIFI : ce n'est pas une contradiction, c'est une différence
+    de convention comptable. Les trois standards sont proposés, et chaque verdict
+    affiche celui qui l'a produit.
+  </p>
+
+  <div class="cadre defilement" style="margin: 16px 0">
+    <table>
+      <thead>
+        <tr>
+          <th>Standard</th><th>Dénominateur</th><th class="a-droite">Dette</th>
+          <th class="a-droite">Liquidités</th><th class="a-droite">Créances</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sid, std in standards.items() %}
+          <tr>
+            <td><strong>{{ std.full }}</strong></td>
+            <td class="secteur">{{ std.denominator_label }}</td>
+            <td class="a-droite num">{{ std.ratios.debt | pourcent }}</td>
+            <td class="a-droite num">{{ std.ratios.liquidity | pourcent }}</td>
+            <td class="a-droite num">{{ std.ratios.receivables | pourcent if std.uses_receivables else '—' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>D'où viennent les chiffres</h2>
+  <p>
+    Les données proviennent de Yahoo Finance. Un point mérite d'être explicité, parce
+    qu'il change les résultats : Yahoo expose les mêmes grandeurs à deux endroits, et
+    <strong>les deux ne concordent pas</strong>. Sa fiche de synthèse annonce 4,05 Md€
+    de trésorerie pour L'Oréal, quand le bilan au 31/12/2025 en porte 9,90 Md€ — la
+    fiche agrège des périodes hétérogènes sans dire lesquelles.
+  </p>
+  <p>
+    Nous lisons donc <strong>le bilan publié, et lui seul</strong>, pour tout ce qui
+    entre dans les ratios : dette, trésorerie et créances proviennent du même arrêté
+    comptable, et cet arrêté est affiché sur chaque fiche. Un ratio dont on ne peut pas
+    nommer la date n'est pas vérifiable. Seule la capitalisation boursière vient de la
+    fiche de synthèse, puisqu'elle est par nature au cours du jour.
+  </p>
+
+  <h2>Ce que cet outil ne sait pas faire</h2>
+
+  <h3>Le filtre des 5 % de revenus non conformes</h3>
+  <p>
+    Les trois standards imposent un critère de plus : les revenus tirés d'activités non
+    conformes — intérêts perçus, ventes accessoires d'alcool — doivent rester sous 5 %
+    du chiffre d'affaires. <strong>Ce chiffre ne se déduit pas des données de
+    marché.</strong> Il se lit dans le rapport annuel, ligne par ligne, et aucune source
+    gratuite ne le publie.
+  </p>
+  <p>
+    Nous ne l'estimons pas et nous ne le passons pas sous silence. Tout verdict
+    « conforme » affiché ici signifie <strong>conforme sur les critères
+    calculables</strong>, et la mention accompagne systématiquement le résultat. C'est
+    la principale limite de cet outil, et la raison pour laquelle il ne remplace pas la
+    lecture d'un rapport annuel.
+  </p>
+
+  <h3>Les approximations assumées</h3>
+  <ul>
+    <li>
+      Le <strong>Dow Jones Islamic Market</strong> rapporte les montants à la
+      capitalisation <em>moyenne sur 24 mois</em>. Nous utilisons celle du jour : sur une
+      valeur très volatile, notre verdict peut différer de l'indice officiel.
+    </li>
+    <li>
+      La ligne « trésorerie et placements » retient la trésorerie et les placements à
+      court terme, mais pas les <strong>titres de participation</strong> classés
+      disponibles à la vente, qui ne portent pas intérêt. Ce choix est conservateur pour
+      certaines sociétés, discutable pour d'autres.
+    </li>
+    <li>
+      La classification sectorielle de Yahoo est <strong>grossière</strong>. C'est une
+      raison de plus d'assumer la catégorie « à vérifier » plutôt que de trancher à sa
+      place.
+    </li>
+  </ul>
+
+  <h2>Ce que Tayyib n'est pas</h2>
+  <p>
+    Ce n'est pas un <strong>conseil en investissement</strong>. Les verdicts sont le
+    résultat mécanique d'un standard appliqué à des données publiques ; ils ne tiennent
+    compte ni de votre situation, ni de vos objectifs, ni de votre horizon. Un conseil
+    personnalisé relève d'une activité réglementée, exercée par des conseillers agréés.
+  </p>
+  <p>
+    Ce n'est pas non plus une <strong>fatwa</strong>. Les standards implémentés ici sont
+    des conventions élaborées par des comités de savants pour rendre le screening
+    industrialisable ; ils sont un point de départ raisonnable, pas une autorité
+    religieuse. Sur ce qui engage votre religion, la référence reste un savant qualifié.
+  </p>
+
+</main>
+{% endblock %}

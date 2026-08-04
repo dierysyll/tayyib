@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block titre %}{{ societe.nom }}{% endblock %}
+
+{% block contenu %}
+<main class="page">
+
+  <a class="retour" href="/?standard={{ standard.id }}">← Toutes les valeurs</a>
+
+  <div class="fiche-tete">
+    <div>
+      <h1 class="fiche-titre">{{ societe.nom }}</h1>
+      <p class="fiche-sous num">
+        {{ societe.ticker }}
+        {%- if societe.industry %} · {{ societe.industry }}{% endif %}
+        {%- if societe.market_cap %} · {{ societe.market_cap | montant }} {{ societe.currency or '' }}{% endif %}
+      </p>
+    </div>
+    <span class="verdict v-{{ resultat.verdict }}">{{ engine.VERDICT_LABELS[resultat.verdict] }} — {{ standard.label }}</span>
+  </div>
+
+  <div class="motif m-{{ resultat.verdict }}">{{ resultat.raison }}</div>
+
+  {% if resultat.ratios %}
+    <h2 class="section">Ratios financiers — {{ standard.full }}</h2>
+    <div class="ratios">
+      {% for r in resultat.ratios %}
+        <div class="ratio r-{{ r.statut }}">
+          <div class="ratio-tete">
+            <div>
+              <div class="ratio-nom">{{ r.label }}</div>
+              <div class="ratio-detail num">
+                {% if r.montant is not none %}{{ r.montant | montant }} rapporté à la {{ standard.denominator_label }}
+                {% else %}Ligne absente du bilan publié{% endif %}
+              </div>
+            </div>
+            <div class="ratio-val num">{{ r.valeur | pourcent }}</div>
+          </div>
+          {% if r.valeur is not none %}
+            {# La jauge est cadrée à 1,5× le seuil : au-delà, le dépassement
+               est acquis et l'échelle exacte n'apporte plus rien. #}
+            {% set echelle = r.seuil * 1.5 %}
+            <div class="jauge">
+              <div class="jauge-barre" style="width: {{ [r.valeur / echelle * 100, 100] | min }}%"></div>
+              <div class="jauge-seuil" style="left: {{ r.seuil / echelle * 100 }}%"></div>
+            </div>
+            <div class="jauge-legende num">
+              <span>0 %</span>
+              <span>seuil {{ r.seuil | pourcent }}</span>
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    {% if societe.bilan_date %}
+      <p class="pied-liens" style="margin-top:10px">
+        Montants issus du bilan arrêté au {{ societe.bilan_date | date_fr }}.
+        Capitalisation au {{ fetched_at | date_fr }}.
+      </p>
+    {% endif %}
+  {% endif %}
+
+  {# Inutile de répéter le motif sectoriel quand c'est lui qui a produit le
+     verdict affiché en tête de page. #}
+  {% if resultat.sector_reason and resultat.sector_reason != resultat.raison %}
+    <h2 class="section">Filtre sectoriel</h2>
+    <div class="motif m-{{ 'non_conforme' if resultat.sector_verdict == 'exclu' else 'a_verifier' }}">
+      {{ resultat.sector_reason }}
+    </div>
+  {% endif %}
+
+  {% if resultat.revenue_filter_pending %}
+    <div class="encart">
+      <p><strong>Le filtre des 5 % reste à votre charge.</strong>
+      {{ standard.label }} exige que les revenus tirés d'activités non conformes restent
+      sous 5 % du chiffre d'affaires. Cette information n'existe dans aucune source de
+      données de marché — elle se lit dans le rapport annuel de {{ societe.nom }},
+      ligne par ligne. Nous préférons vous le dire plutôt que de l'estimer.</p>
+      {% if societe.site %}<p><a href="{{ societe.site }}" rel="nofollow noopener" target="_blank">Site institutionnel de la société →</a></p>{% endif %}
+    </div>
+
+    <h2 class="section">Purification des dividendes</h2>
+    <div class="calc">
+      <div class="calc-champs">
+        <div class="champ">
+          <label for="div">Dividendes perçus (€)</label>
+          <input type="number" id="div" min="0" step="0.01" value="{{ '%.2f' | format(societe.dividende_par_action) if societe.dividende_par_action else '' }}" placeholder="0,00">
+        </div>
+        <div class="champ">
+          <label for="part">Part des revenus non conformes (%)</label>
+          <input type="number" id="part" min="0" max="100" step="0.01" placeholder="ex. 2,4">
+        </div>
+        <div class="calc-sortie">
+          <div class="cs-lb">Montant à purifier</div>
+          <div class="cs-val" id="sortie">—</div>
+        </div>
+      </div>
+      <p class="comp-note">
+        La part des revenus non conformes se lit dans le rapport annuel.
+        {% if societe.dividende_par_action %}Le champ dividende est prérempli avec le dividende annuel par action ({{ '%.2f' | format(societe.dividende_par_action) }} {{ societe.currency or '' }}) : remplacez-le par le total que vous avez réellement perçu.{% endif %}
+      </p>
+    </div>
+  {% endif %}
+
+  <h2 class="section">Le même titre selon les trois standards</h2>
+  <div class="comparaison">
+    {% for c in comparaison %}
+      <div class="comp-carte">
+        <div class="comp-nom">{{ c.standard.full }}</div>
+        <span class="verdict v-{{ c.resultat.verdict }}">{{ engine.VERDICT_LABELS[c.resultat.verdict] }}</span>
+        <p class="comp-note">{{ c.standard.note }}</p>
+      </div>
+    {% endfor %}
+  </div>
+  <p class="comp-note" style="margin-top:12px; max-width:68ch">
+    Un écart entre ces trois colonnes n'est pas une erreur : les standards ne
+    rapportent pas les mêmes montants au même dénominateur.
+    <a href="/methodologie">Le détail des règles →</a>
+  </p>
+
+  {% if societe.resume %}
+    <h2 class="section">Activité</h2>
+    <p class="chapeau" style="max-width:68ch">{{ societe.resume[:700] }}{% if societe.resume | length > 700 %}…{% endif %}</p>
+  {% endif %}
+
+</main>
+
+<script>
+  // Purification : dividende × part des revenus non conformes.
+  (function () {
+    var div = document.getElementById('div'),
+        part = document.getElementById('part'),
+        sortie = document.getElementById('sortie');
+    if (!div || !part) return;
+
+    function calcule() {
+      var d = parseFloat(div.value), p = parseFloat(part.value);
+      if (isNaN(d) || isNaN(p)) { sortie.textContent = '—'; return; }
+      sortie.textContent = (d * p / 100).toFixed(2).replace('.', ',') + ' €';
+    }
+    div.addEventListener('input', calcule);
+    part.addEventListener('input', calcule);
+  })();
+</script>
+{% endblock %}

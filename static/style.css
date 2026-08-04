@@ -1,0 +1,297 @@
+/* Tayyib — feuille de style unique.
+
+   Parti pris graphique : ne pas faire « produit musulman » au sens
+   décoratif du terme. Pas d'arabesque, pas de vert de mosquée, pas de
+   croissant. Le lecteur vient chercher une information financière et doit
+   reconnaître un outil financier — sobre, dense, lisible. Le seul signe
+   identitaire est le nom.
+
+   Sombre par défaut, clair si le système le demande. */
+
+:root {
+  --fond: #0c0f14;
+  --surface: #141920;
+  --surface-haute: #1a212b;
+  --bord: #232c39;
+  --texte: #e8ecf1;
+  --texte-doux: #8b97a8;
+  --texte-faible: #616d7e;
+
+  --jade: #35d39a;
+  --jade-fond: #35d39a1f;
+  --ambre: #f0b23c;
+  --ambre-fond: #f0b23c1f;
+  --rose: #f2637e;
+  --rose-fond: #f2637e1f;
+
+  --rayon: 10px;
+  --largeur: 1080px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --fond: #f7f8fa;
+    --surface: #ffffff;
+    --surface-haute: #f0f2f5;
+    --bord: #e2e6ec;
+    --texte: #131820;
+    --texte-doux: #5b6675;
+    --texte-faible: #8892a0;
+
+    --jade: #0e9f6e;
+    --jade-fond: #0e9f6e17;
+    --ambre: #b77609;
+    --ambre-fond: #b7760917;
+    --rose: #d33d5c;
+    --rose-fond: #d33d5c17;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--fond);
+  color: var(--texte);
+  /* `ui-sans-serif` n'est pas résolu partout et retombe alors sur une
+     serif : on garde donc une pile explicite derrière lui. */
+  font: 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+
+/* Les chiffres alignés en colonne : indispensable dans un tableau
+   financier, sinon les ordres de grandeur ne se comparent pas à l'œil. */
+.num { font-variant-numeric: tabular-nums; }
+
+/* --- En-tête ---------------------------------------------------------- */
+
+.entete {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 20px;
+  max-width: var(--largeur); margin: 0 auto; padding: 22px 20px;
+}
+
+.marque { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.marque-logo { width: 30px; height: 30px; }
+.marque-logo rect { fill: var(--surface-haute); }
+.marque-logo path { stroke: var(--jade); }
+.marque-nom { font-size: 19px; font-weight: 640; letter-spacing: -0.02em; }
+
+.nav { display: flex; gap: 4px; }
+.nav a {
+  padding: 7px 13px; border-radius: 7px; text-decoration: none;
+  color: var(--texte-doux); font-size: 14px; font-weight: 500;
+}
+.nav a:hover { color: var(--texte); background: var(--surface); }
+.nav a.on { color: var(--texte); background: var(--surface-haute); }
+
+/* --- Structure -------------------------------------------------------- */
+
+.page { max-width: var(--largeur); margin: 0 auto; padding: 12px 20px 60px; }
+
+.titre-page {
+  font-size: clamp(28px, 5vw, 38px); font-weight: 660;
+  letter-spacing: -0.03em; margin: 18px 0 8px;
+}
+.chapeau { color: var(--texte-doux); font-size: 16px; margin: 0 0 26px; max-width: 62ch; }
+
+/* --- Compteurs -------------------------------------------------------- */
+
+.compteurs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 22px; }
+
+.compteur {
+  flex: 1 1 150px; padding: 15px 17px;
+  background: var(--surface); border: 1px solid var(--bord);
+  border-radius: var(--rayon); text-decoration: none;
+  transition: border-color .12s;
+}
+.compteur:hover { border-color: var(--texte-faible); }
+.compteur.on { border-color: currentColor; }
+.compteur-nb { font-size: 27px; font-weight: 660; letter-spacing: -0.02em; }
+.compteur-lb { font-size: 13px; color: var(--texte-doux); }
+.compteur.c-conforme { color: var(--jade); }
+.compteur.c-a_verifier { color: var(--ambre); }
+.compteur.c-non_conforme { color: var(--rose); }
+.compteur.c-tous { color: var(--texte); }
+.compteur.c-tous .compteur-nb { color: var(--texte); }
+.compteur .compteur-lb { color: var(--texte-doux); }
+
+/* --- Barre d'outils --------------------------------------------------- */
+
+.outils {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  margin-bottom: 16px;
+}
+
+.recherche { flex: 1 1 240px; display: flex; }
+.recherche input {
+  width: 100%; padding: 10px 13px;
+  background: var(--surface); color: var(--texte);
+  border: 1px solid var(--bord); border-radius: var(--rayon);
+  font: inherit; font-size: 14px;
+}
+.recherche input::placeholder { color: var(--texte-faible); }
+.recherche input:focus { outline: 2px solid var(--jade); outline-offset: -1px; }
+
+.segments { display: flex; gap: 3px; padding: 3px; background: var(--surface); border: 1px solid var(--bord); border-radius: var(--rayon); }
+.segments a {
+  padding: 7px 12px; border-radius: 7px; text-decoration: none;
+  font-size: 13px; font-weight: 500; color: var(--texte-doux); white-space: nowrap;
+}
+.segments a:hover { color: var(--texte); }
+.segments a.on { background: var(--surface-haute); color: var(--texte); }
+
+/* --- Tableau ---------------------------------------------------------- */
+
+.cadre {
+  background: var(--surface); border: 1px solid var(--bord);
+  border-radius: var(--rayon); overflow: hidden;
+}
+.defilement { overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; min-width: 660px; }
+
+th {
+  text-align: left; padding: 11px 16px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--texte-faible); border-bottom: 1px solid var(--bord);
+  white-space: nowrap;
+}
+td { padding: 13px 16px; border-bottom: 1px solid var(--bord); }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: var(--surface-haute); }
+.a-droite { text-align: right; }
+
+.nom-valeur { text-decoration: none; font-weight: 560; }
+.nom-valeur:hover { color: var(--jade); }
+.ticker { color: var(--texte-faible); font-size: 12.5px; margin-top: 1px; }
+.secteur { color: var(--texte-doux); font-size: 13px; }
+
+/* --- Pastilles de verdict --------------------------------------------- */
+
+.verdict {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px 4px 8px; border-radius: 100px;
+  font-size: 12.5px; font-weight: 560; white-space: nowrap;
+}
+.verdict::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.v-conforme { color: var(--jade); background: var(--jade-fond); }
+.v-a_verifier { color: var(--ambre); background: var(--ambre-fond); }
+.v-non_conforme { color: var(--rose); background: var(--rose-fond); }
+
+/* --- Fiche valeur ----------------------------------------------------- */
+
+.retour { display: inline-block; color: var(--texte-doux); text-decoration: none; font-size: 14px; margin: 14px 0 6px; }
+.retour:hover { color: var(--texte); }
+
+.fiche-tete { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+.fiche-titre { font-size: clamp(25px, 4vw, 33px); font-weight: 660; letter-spacing: -0.03em; margin: 0; }
+.fiche-sous { color: var(--texte-doux); font-size: 14.5px; margin: 3px 0 0; }
+
+.motif {
+  padding: 14px 16px; border-radius: var(--rayon); margin: 18px 0 26px;
+  border: 1px solid var(--bord); background: var(--surface);
+  font-size: 14.5px;
+}
+.motif.m-conforme { border-left: 3px solid var(--jade); }
+.motif.m-a_verifier { border-left: 3px solid var(--ambre); }
+.motif.m-non_conforme { border-left: 3px solid var(--rose); }
+
+h2.section { font-size: 15px; font-weight: 620; margin: 32px 0 12px; letter-spacing: -0.01em; }
+
+/* Barres de ratio : la position du repère de seuil est ce qui rend le
+   verdict lisible d'un coup d'œil, bien plus que le chiffre. */
+.ratios { display: grid; gap: 2px; }
+.ratio { padding: 15px 17px; background: var(--surface); border: 1px solid var(--bord); }
+.ratio:first-child { border-radius: var(--rayon) var(--rayon) 0 0; }
+.ratio:last-child { border-radius: 0 0 var(--rayon) var(--rayon); }
+.ratio + .ratio { border-top: 0; }
+.ratio-tete { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 9px; }
+.ratio-nom { font-size: 14px; font-weight: 540; }
+.ratio-detail { font-size: 12.5px; color: var(--texte-faible); }
+.ratio-val { font-size: 15px; font-weight: 620; }
+.r-ok .ratio-val { color: var(--jade); }
+.r-depasse .ratio-val { color: var(--rose); }
+.r-inconnu .ratio-val { color: var(--texte-faible); }
+
+.jauge { position: relative; height: 7px; background: var(--surface-haute); border-radius: 4px; overflow: hidden; }
+.jauge-barre { height: 100%; border-radius: 4px; }
+.r-ok .jauge-barre { background: var(--jade); }
+.r-depasse .jauge-barre { background: var(--rose); }
+.jauge-seuil { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--texte-doux); border-radius: 2px; }
+.jauge-legende { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--texte-faible); margin-top: 6px; }
+
+/* --- Encart d'avertissement dans la page ------------------------------ */
+
+.encart {
+  padding: 15px 17px; border-radius: var(--rayon);
+  background: var(--ambre-fond); border: 1px solid color-mix(in srgb, var(--ambre) 30%, transparent);
+  font-size: 14px; margin: 22px 0;
+}
+.encart strong { color: var(--ambre); }
+.encart p { margin: 0; }
+.encart p + p { margin-top: 8px; }
+
+/* --- Comparaison des standards ---------------------------------------- */
+
+.comparaison { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 10px; }
+.comp-carte { padding: 15px 17px; background: var(--surface); border: 1px solid var(--bord); border-radius: var(--rayon); }
+.comp-nom { font-size: 13px; color: var(--texte-doux); margin-bottom: 9px; }
+.comp-note { font-size: 12.5px; color: var(--texte-faible); margin-top: 10px; line-height: 1.5; }
+
+/* --- Calculateur de purification -------------------------------------- */
+
+.calc { padding: 17px; background: var(--surface); border: 1px solid var(--bord); border-radius: var(--rayon); }
+.calc-champs { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.champ { flex: 1 1 155px; }
+.champ label { display: block; font-size: 12.5px; color: var(--texte-doux); margin-bottom: 5px; }
+.champ input {
+  width: 100%; padding: 9px 12px; background: var(--fond); color: var(--texte);
+  border: 1px solid var(--bord); border-radius: 8px; font: inherit; font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.champ input:focus { outline: 2px solid var(--jade); outline-offset: -1px; }
+.calc-sortie { flex: 1 1 155px; padding: 9px 12px; background: var(--jade-fond); border-radius: 8px; }
+.calc-sortie .cs-lb { font-size: 12px; color: var(--texte-doux); }
+.calc-sortie .cs-val { font-size: 19px; font-weight: 660; color: var(--jade); font-variant-numeric: tabular-nums; }
+
+/* --- Méthodologie ----------------------------------------------------- */
+
+.prose { max-width: 68ch; }
+.prose h2 { font-size: 19px; font-weight: 640; margin: 34px 0 10px; letter-spacing: -0.02em; }
+.prose h3 { font-size: 15px; font-weight: 620; margin: 22px 0 6px; }
+.prose p, .prose li { color: var(--texte-doux); }
+.prose li { margin-bottom: 7px; }
+.prose strong { color: var(--texte); font-weight: 580; }
+.prose code {
+  background: var(--surface-haute); padding: 1.5px 6px; border-radius: 5px;
+  font-size: 13px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* --- Pied ------------------------------------------------------------- */
+
+.pied { max-width: var(--largeur); margin: 0 auto; padding: 26px 20px 44px; border-top: 1px solid var(--bord); }
+.avertissement { font-size: 13px; color: var(--texte-faible); line-height: 1.65; max-width: 78ch; margin: 0 0 12px; }
+.avertissement strong { color: var(--texte-doux); }
+.pied-liens { font-size: 13px; color: var(--texte-faible); margin: 0; }
+.pied-liens a { color: var(--texte-doux); }
+
+.vide { padding: 44px 20px; text-align: center; color: var(--texte-doux); }
+
+@media (max-width: 560px) {
+  .entete { padding: 16px 16px; }
+  .page { padding: 8px 16px 44px; }
+  .compteur { flex-basis: 44%; }
+
+  /* Le verdict est la colonne pour laquelle on vient : elle doit tenir
+     sans défilement horizontal. On ne garde donc que le nom et le verdict.
+     Secteur, ratio et capitalisation restent sur la fiche de la valeur. */
+  table { min-width: 0; }
+  th:nth-child(2), td:nth-child(2),
+  th:nth-child(4), td:nth-child(4),
+  th:nth-child(5), td:nth-child(5) { display: none; }
+  th, td { padding-left: 12px; padding-right: 12px; }
+}
