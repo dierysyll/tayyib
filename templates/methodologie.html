@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "icones.html" import icone, pays %}
 {% block titre %}Méthodologie{% endblock %}
 
 {% block contenu %}
@@ -32,7 +33,7 @@
         <ul>
           {% for p in region.places %}
             <li>
-              <a href="/place/{{ p.id }}"><strong>{{ p.drapeau }} {{ p.nom }}</strong></a> —
+              <a href="/place/{{ p.id }}">{{ pays(p.code, p.region) }} <strong>{{ p.nom }}</strong></a> —
               {{ p.pays }}, {{ p.indice }}, coté en {{ p.devise }}{% if p.id not in collectees %}
               <em>(pas encore collectée)</em>{% endif %}.
               {% if p.note %}{{ p.note }}{% endif %}
@@ -51,7 +52,7 @@
   </p>
   <ul>
     {% for a in absentes %}
-      <li><strong>{{ a.drapeau }} {{ a.nom }}</strong> ({{ a.pays }}) — {{ a.raison }}</li>
+      <li><strong>{{ a.nom }}</strong> ({{ a.pays }}) — {{ a.raison }}</li>
     {% endfor %}
   </ul>
 

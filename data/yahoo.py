@@ -38,6 +38,8 @@ Deux précautions rendent ce calcul juste :
 
 import yfinance as yf
 
+from data.presse import sans_emoji
+
 
 class SourceIndisponible(Exception):
     """Yahoo nous a bloqués — la donnée existe, on n'y a pas accès.
@@ -328,13 +330,15 @@ def _article(brut, ticker):
         except (ValueError, OSError, OverflowError):
             publie = None
 
+    # Même nettoyage que pour la presse : l'interface n'emploie aucun emoji,
+    # les titres agrégés ne doivent pas en réintroduire.
     return {
         "ticker": ticker,
-        "titre": titre,
+        "titre": sans_emoji(titre),
         "lien": lien,
         "source": source,
         "publie": publie,
-        "resume": _texte(contenu.get("summary"), contenu.get("description")),
+        "resume": sans_emoji(_texte(contenu.get("summary"), contenu.get("description"))),
     }
 
 

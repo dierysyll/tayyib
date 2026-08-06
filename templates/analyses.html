@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "icones.html" import icone, pays %}
 {% block titre %}Analyses{% endblock %}
 {% block description %}Ce que le screening halal révèle à l'échelle de l'univers : basculements de conformité, palmarès des valeurs conformes, taux de conformité par place, désaccords entre standards.{% endblock %}
 
@@ -48,7 +49,7 @@
             par désendettement.
           </p>
         </div>
-        <span class="carte-icone i-vert">↑</span>
+        <span class="carte-icone i-vert">{{ icone("hausse") }}</span>
       </div>
       <div class="carte-corps">
         {% if entrees %}
@@ -75,7 +76,7 @@
             C'est le cas qui oblige à arbitrer.
           </p>
         </div>
-        <span class="carte-icone i-rouge">↓</span>
+        <span class="carte-icone i-rouge">{{ icone("baisse") }}</span>
       </div>
       <div class="carte-corps">
         {% if sorties %}
@@ -111,7 +112,7 @@
           <h3 class="carte-titre">Meilleurs rendements conformes</h3>
           <p class="carte-sous">Dividende rapporté au cours. Réservé aux valeurs conformes : classer des valeurs exclues par leur rendement serait une invitation contradictoire.</p>
         </div>
-        <span class="carte-icone i-vert">%</span>
+        <span class="carte-icone i-vert">{{ icone("pourcent") }}</span>
       </div>
       <div class="carte-corps">
         {% if rendements %}
@@ -134,7 +135,7 @@
           <h3 class="carte-titre">Plus grosses capitalisations conformes</h3>
           <p class="carte-sous">Converties en euros, donc comparables d'une place à l'autre.</p>
         </div>
-        <span class="carte-icone i-europe">€</span>
+        <span class="carte-icone i-europe">{{ icone("euro") }}</span>
       </div>
       <div class="carte-corps">
         {% if tailles %}
@@ -165,7 +166,7 @@
           capitalisation boursière, MSCI au total du bilan.
         </p>
       </div>
-      <span class="carte-icone i-ambre">⚖</span>
+      <span class="carte-icone i-ambre">{{ icone("balance") }}</span>
     </div>
     <div class="carte-corps">
       {% if desaccords %}
@@ -249,7 +250,7 @@
           pas le secteur d'activité, et tout y tombe donc en « à vérifier ».
         </p>
       </div>
-      <span class="carte-icone i-musulman">🌍</span>
+      <span class="carte-icone i-musulman">{{ icone("globe") }}</span>
     </div>
     <div class="carte-corps">
       <div class="defilement">
@@ -269,7 +270,7 @@
               <tr>
                 <td>
                   <a class="nom-valeur" href="/?standard={{ standard.id }}&amp;region={{ p.place.region }}&amp;place={{ p.place.id }}">
-                    <span class="drapeau">{{ p.place.drapeau }}</span> {{ p.place.nom }}
+                    {{ pays(p.place.code, p.place.region) }} {{ p.place.nom }}
                   </a>
                   <div class="ticker">{{ p.place.indice }}</div>
                 </td>

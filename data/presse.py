@@ -45,19 +45,19 @@ RUBRIQUES = {
         "id": "marches",
         "nom": "Marchés",
         "resume": "L'actualité économique et boursière.",
-        "icone": "📈",
+        "icone": "marche",
     },
     "afrique": {
         "id": "afrique",
         "nom": "Afrique francophone",
         "resume": "Le Maghreb et l'Afrique de l'Ouest — la zone la moins servie par les screeners.",
-        "icone": "🌍",
+        "icone": "globe",
     },
     "monde-musulman": {
         "id": "monde-musulman",
         "nom": "Monde musulman",
         "resume": "Ce qui concerne les musulmans, au-delà de la finance.",
-        "icone": "🕌",
+        "icone": "croissant",
     },
 }
 
@@ -111,6 +111,23 @@ BALISES = re.compile(r"<[^>]+>")
 ESPACES = re.compile(r"\s+")
 IMG_SRC = re.compile(r'<img[^>]+src=["\']([^"\']+)["\']', re.I)
 
+# Certains éditeurs ornent leurs titres d'emojis — « 💧 », « 📣 » — qui
+# détonnent dans une interface qui n'en emploie aucun. On les retire de
+# l'affichage : ce sont des ornements, ils ne portent pas de sens, et leur
+# suppression ne dénature pas le titre. Le lien mène toujours à l'original.
+EMOJIS = re.compile(
+    "[\U0001F1E6-\U0001F1FF]{2}"          # drapeaux
+    "|[\U0001F300-\U0001FAFF]"            # pictogrammes
+    "|[☀-➿]"                    # symboles divers
+    "|[️‍]"                     # sélecteurs de variante, liant
+)
+
+
+def sans_emoji(texte):
+    if not texte:
+        return texte
+    return ESPACES.sub(" ", EMOJIS.sub("", texte)).strip()
+
 
 def _texte_propre(brut, limite=240):
     """Un résumé lisible à partir d'un fragment HTML de flux RSS."""
@@ -120,10 +137,11 @@ def _texte_propre(brut, limite=240):
     texte = ESPACES.sub(" ", texte).strip()
     if not texte:
         return None
+    texte = sans_emoji(texte)
     if len(texte) > limite:
         coupe = texte[:limite].rsplit(" ", 1)[0]
         texte = coupe + "…"
-    return texte
+    return texte or None
 
 
 def _image(item):
@@ -194,7 +212,7 @@ def _articles_du_flux(source, limite):
             continue
 
         articles.append({
-            "titre": html.unescape(titre),
+            "titre": sans_emoji(html.unescape(titre)),
             "lien": lien,
             "source": source["nom"],
             "rubrique": source["rubrique"],

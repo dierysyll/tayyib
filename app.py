@@ -447,8 +447,8 @@ def api_recherche():
     entrees += [
         {
             "type": "place",
-            "libelle": f'{p["drapeau"]} {p["nom"]}',
-            "detail": f'{p["pays"]} · {p["indice"]}',
+            "libelle": p["nom"],
+            "detail": f'{p["code"]} · {p["pays"]} · {p["indice"]}',
             "url": f'/place/{pid}?standard={standard_id}',
             "cle": alias.sans_accents(f'{p["nom"]} {p["pays"]} {p["indice"]} {p["devise"]}'),
             "poids": 1e12,

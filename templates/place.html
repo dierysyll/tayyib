@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "icones.html" import icone, pays %}
 {% block titre %}{{ place.nom }}{% endblock %}
 {% block description %}Le screening halal de la place de {{ place.nom }} ({{ place.pays }}) : {{ total }} valeurs, taux de conformité par standard et par secteur.{% endblock %}
 
@@ -9,7 +10,7 @@
 
   <div class="place-tete">
     <div style="display:flex;gap:18px;align-items:flex-start">
-      <span class="place-drapeau">{{ place.drapeau }}</span>
+      <span class="place-ecusson pays-{{ place.region }}">{{ place.code }}</span>
       <div>
         <h1 class="place-titre">{{ place.nom }}</h1>
         <p class="place-sous">

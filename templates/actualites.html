@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "icones.html" import icone, pays %}
 {% block titre %}Actualités{% endblock %}
 {% block description %}L'actualité économique francophone, l'Afrique et le monde musulman, plus les dépêches rattachées aux valeurs de l'univers avec leur verdict de conformité.{% endblock %}
 
@@ -12,7 +13,7 @@
       {% if a.source %}<span class="actu-source">{{ a.source }}</span>{% endif %}
       {% if a.societe %}
         <span class="actu-valeur">
-          {% if a.place %}<span class="drapeau">{{ a.place.drapeau }}</span>{% endif %}
+          {% if a.place %}{{ pays(a.place.code, a.place.region) }}{% endif %}
           {{ a.societe.nom | truncate(26, true, '…') }}
         </span>
       {% endif %}
@@ -42,12 +43,12 @@
       {% for rid, r in rubriques.items() %}
         <a class="pastille {% if rubrique == rid %}on{% endif %}"
            href="?standard={{ standard.id }}&amp;rubrique={{ rid }}">
-          {{ r.icone }} {{ r.nom }} <span class="compte">{{ comptes[rid] }}</span>
+          {{ icone(r.icone, 15) }} {{ r.nom }} <span class="compte">{{ comptes[rid] }}</span>
         </a>
       {% endfor %}
       <a class="pastille {% if rubrique == 'valeurs' %}on{% endif %}"
          href="?standard={{ standard.id }}&amp;rubrique=valeurs">
-        📊 Par valeur <span class="compte">{{ comptes.valeurs }}</span>
+        {{ icone("valeurs", 15) }} Par valeur <span class="compte">{{ comptes.valeurs }}</span>
       </a>
     </div>
   </div>

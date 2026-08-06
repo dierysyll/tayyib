@@ -19,8 +19,8 @@ mieux qu'un trou.
 """
 
 LANGUES = {
-    "fr": {"code": "fr", "nom": "Français", "drapeau": "🇫🇷"},
-    "en": {"code": "en", "nom": "English", "drapeau": "🇬🇧"},
+    "fr": {"code": "fr", "nom": "Français", "code_pays": "FR"},
+    "en": {"code": "en", "nom": "English", "code_pays": "EN"},
 }
 
 LANGUE_DEFAUT = "fr"

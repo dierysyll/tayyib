@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "icones.html" import icone, pays %}
 {% block titre %}{{ societe.nom }}{% endblock %}
 
 {% block contenu %}
@@ -11,7 +12,7 @@
       {% if place %}
         <p class="place-tag" style="margin:0 0 8px">
           <span class="place-pip p-{{ place.region }}"></span>
-          <span class="drapeau">{{ place.drapeau }}</span>
+          {{ pays(place.code, place.region) }}
           {{ place.nom }} · {{ place.indice }}
         </p>
       {% endif %}
@@ -35,143 +36,259 @@
   </div>
 
   <div class="motif m-{{ resultat.verdict }}">{{ resultat.raison }}</div>
-
   {# --- Cours et conformité, sur le même axe -------------------------
 
-     Le graphique est rendu côté serveur, avec les arrêtés comptables en
-     repères : il s'affiche donc sans JavaScript. Le sélecteur de période
-     ci-dessous l'enrichit quand JavaScript est disponible, en allant
-     chercher le pas journalier — six ans de points hebdomadaires ne
-     permettent pas de lire un mois. #}
+     Le graphique porte trois informations superposées, et c'est le
+     recouvrement qui fait sa valeur : le cours, les arrêtés comptables, et
+     le verdict de chaque exercice. Une courbe seule ne dirait qu'une
+     tendance ; ici on voit à quel niveau de cours l'entreprise était
+     conforme, et à partir de quand elle a cessé de l'être. #}
   {% if graphique %}
     <div class="graphique-tete">
-      <h2 class="section" style="margin:0">
-        Cours
-        <span class="section-note num {{ 'hausse' if graphique.variation >= 0 else 'baisse' }}"
-              id="variation">{{ graphique.variation | signe }}</span>
-      </h2>
-      <div class="periodes" id="periodes" hidden>
+      <div>
+        <h2 class="section" style="margin:0">
+          Cours
+          <span class="section-note num {{ 'hausse' if graphique.variation >= 0 else 'baisse' }}"
+                id="variation">{{ graphique.variation | signe }}</span>
+        </h2>
+        <p class="graphique-periode" id="periode-lue"></p>
+      </div>
+      <div class="periodes" id="periodes">
         <button type="button" data-jours="30">1 M</button>
         <button type="button" data-jours="180">6 M</button>
-        <button type="button" data-jours="365">1 an</button>
-        <button type="button" data-jours="1825" class="on">5 ans</button>
+        <button type="button" data-jours="365" class="on">1 an</button>
+        <button type="button" data-jours="1825">5 ans</button>
         <button type="button" data-jours="0">Max</button>
       </div>
     </div>
+
     <div class="cadre graphique">
-      <svg viewBox="0 0 {{ graphique.largeur }} {{ graphique.hauteur }}" preserveAspectRatio="none" class="courbe" role="img"
-           aria-label="Cours de {{ societe.nom }} sur cinq ans, avec le verdict de conformité à chaque arrêté comptable">
-        <defs>
-          <linearGradient id="degrade" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" class="deg-haut"/>
-            <stop offset="100%" class="deg-bas"/>
-          </linearGradient>
-        </defs>
-        <path d="{{ graphique.aire }}" fill="url(#degrade)"/>
-        <path d="{{ graphique.ligne }}" class="trait" fill="none" vector-effect="non-scaling-stroke"/>
-        {% for r in graphique.reperes %}
-          <line x1="{{ r.x }}" y1="{{ r.y }}" x2="{{ r.x }}" y2="{{ graphique.base_y }}"
-                class="repere-tige rv-{{ r.verdict }}" vector-effect="non-scaling-stroke"/>
-          <circle cx="{{ r.x }}" cy="{{ r.y }}" r="4.5" class="repere rv-{{ r.verdict }}"
-                  vector-effect="non-scaling-stroke"/>
-        {% endfor %}
-      </svg>
-      <div class="graphique-axe num">
-        <span id="axe-bas">{{ graphique.bas | nombre }}</span>
-        <span class="graphique-legende" id="legende">
-          {% for r in graphique.reperes %}<span class="leg leg-{{ r.verdict }}">{{ r.annee }}</span>{% endfor %}
-        </span>
-        <span id="axe-haut">{{ graphique.haut | nombre }}</span>
+      <div class="graphe-hote" id="graphe">
+        <noscript>
+          <svg viewBox="0 0 {{ graphique.largeur }} {{ graphique.hauteur }}" preserveAspectRatio="none" class="courbe">
+            <path d="{{ graphique.ligne }}" class="trait" fill="none" vector-effect="non-scaling-stroke"/>
+          </svg>
+          <p class="graphique-note">Le détail interactif du cours demande JavaScript.</p>
+        </noscript>
       </div>
-      <div class="curseur-valeur" id="curseur"></div>
+
+      <div class="graphique-legende" id="legende-verdicts">
+        <span class="leg leg-conforme">Exercice conforme</span>
+        <span class="leg leg-a_verifier">À vérifier</span>
+        <span class="leg leg-non_conforme">Non conforme</span>
+      </div>
+
       <p class="graphique-note">
-        Les points marquent chaque arrêté comptable, coloriés selon le verdict
+        Les pastilles marquent chaque arrêté comptable, coloriées selon le verdict
         {{ standard.label }} de l'exercice. C'est la même donnée que le tableau
-        ci-dessous, lue sur l'axe du cours.
+        ci-dessous, lue sur l'axe du cours : on voit à quel niveau de valorisation
+        la société était conforme, et quand elle a cessé de l'être.
       </p>
     </div>
 
     <script>
-    // Navigation temporelle. La courbe rendue par le serveur reste en place
-    // tant qu'on n'a rien demandé ; dès qu'on choisit une période, on va
-    // chercher le pas journalier et on redessine.
+    // Graphique de cours. Tout est dessiné ici plutôt que servi en SVG figé,
+    // parce qu'un graphique qu'on ne peut ni recadrer ni interroger n'apprend
+    // rien : on veut lire une date, un montant, et situer les arrêtés.
     (function () {
       var TICKER = {{ societe.ticker | tojson }},
           DEVISE = {{ (societe.currency or '') | tojson }},
-          svg = document.querySelector('.courbe'),
+          JALONS = {{ (historique | map(attribute='date') | list) | tojson }},
+          VERDICTS = {{ (historique | map(attribute='verdict') | list) | tojson }};
+
+      var hote = document.getElementById('graphe'),
           barre = document.getElementById('periodes'),
-          curseur = document.getElementById('curseur'),
           variation = document.getElementById('variation'),
-          legende = document.getElementById('legende'),
-          L = 1000, H = 260, donnees = null;
+          periodeLue = document.getElementById('periode-lue');
 
-      if (!svg || !barre) return;
-      barre.hidden = false;
+      if (!hote || !barre) return;
 
-      var nb = function (v, d) {
+      // Marges : sans elles, les libellés d'axe n'ont nulle part où aller.
+      var L = 1000, H = 340, MG = 8, MD = 62, MH = 14, MB = 52;
+      var donnees = null, jours = 365;
+
+      var MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
+                  'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+      function nb(v, d) {
         return v.toLocaleString('fr-FR', {minimumFractionDigits: d, maximumFractionDigits: d});
-      };
+      }
+      function dateCourte(iso) {
+        var p = iso.split('-');
+        return MOIS[+p[1] - 1] + ' ' + p[0].slice(2);
+      }
+      function dateLongue(iso) {
+        var p = iso.split('-');
+        return +p[2] + ' ' + MOIS[+p[1] - 1].replace('.', '') + ' ' + p[0];
+      }
+
+      // Une échelle qui tombe sur des valeurs rondes : « 480 » se lit,
+      // « 483,27 » ne se lit pas.
+      function graduations(bas, haut, combien) {
+        var brut = (haut - bas) / combien;
+        var magnitude = Math.pow(10, Math.floor(Math.log10(brut)));
+        var pas = [1, 2, 2.5, 5, 10].map(function (m) { return m * magnitude; })
+                    .find(function (p) { return p >= brut; }) || magnitude * 10;
+        var g = [], v = Math.ceil(bas / pas) * pas;
+        for (; v <= haut; v += pas) g.push(v);
+        return g;
+      }
 
       function dessine(points) {
-        if (points.length < 2) return;
-        var vals = points.map(function (p) { return p[1]; }),
-            bas = Math.min.apply(null, vals), haut = Math.max.apply(null, vals),
-            etendue = (haut - bas) || 1,
-            pas = L / (points.length - 1);
+        if (!points || points.length < 2) return;
 
-        var x = function (i) { return i * pas; },
-            y = function (v) { return H - ((v - bas) / etendue) * (H - 12) - 6; };
+        var vals = points.map(function (p) { return p[1]; });
+        var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+        var marge = (max - min) * 0.12 || 1;
+        // Un cours ne descend pas sous zéro : sans ce plancher, la marge
+        // basse fabriquait une graduation « −0,00 » dénuée de sens.
+        var bas = Math.max(0, min - marge), haut = max + marge;
 
-        var ligne = points.map(function (p, i) {
+        var x = function (i) { return MG + (i / (points.length - 1)) * (L - MG - MD); };
+        var y = function (v) { return MH + (1 - (v - bas) / (haut - bas)) * (H - MH - MB); };
+
+        var svg = ['<svg viewBox="0 0 ' + L + ' ' + H + '" class="courbe" role="img" ' +
+                   'aria-label="Cours de la valeur sur la période choisie">'];
+
+        svg.push('<defs><linearGradient id="degrade" x1="0" y1="0" x2="0" y2="1">' +
+                 '<stop offset="0%" class="deg-haut"/><stop offset="100%" class="deg-bas"/>' +
+                 '</linearGradient></defs>');
+
+        // Grille horizontale et prix, à droite pour ne pas décaler la courbe.
+        graduations(bas, haut, 4).forEach(function (v) {
+          svg.push('<line class="grille" x1="' + MG + '" x2="' + (L - MD) + '" y1="' + y(v).toFixed(1) +
+                   '" y2="' + y(v).toFixed(1) + '"/>');
+          var val = Math.abs(v) < 1e-9 ? 0 : v;
+          svg.push('<text class="axe-y" x="' + (L - MD + 9) + '" y="' + (y(v) + 4).toFixed(1) + '">' +
+                   nb(val, val > 0 && val < 10 ? 2 : 0) + '</text>');
+        });
+
+        // Dates : cinq repères suffisent, au-delà ils se chevauchent.
+        var nbDates = Math.min(5, points.length);
+        for (var k = 0; k < nbDates; k++) {
+          var i = Math.round(k * (points.length - 1) / (nbDates - 1 || 1));
+          svg.push('<text class="axe-x" x="' + x(i).toFixed(1) + '" y="' + (H - 8) +
+                   '" text-anchor="' + (k === 0 ? 'start' : k === nbDates - 1 ? 'end' : 'middle') +
+                   '">' + dateCourte(points[i][0]) + '</text>');
+        }
+
+        var chemin = points.map(function (p, i) {
           return (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p[1]).toFixed(1);
         }).join(' ');
-        var aire = ligne + ' L' + L + ' ' + H + ' L0 ' + H + ' Z';
+        svg.push('<path d="' + chemin + ' L' + x(points.length - 1).toFixed(1) + ' ' + (H - MB) +
+                 ' L' + MG + ' ' + (H - MB) + ' Z" fill="url(#degrade)"/>');
+        svg.push('<path d="' + chemin + '" class="trait" fill="none" vector-effect="non-scaling-stroke"/>');
 
-        svg.setAttribute('viewBox', '0 0 ' + L + ' ' + H);
-        svg.innerHTML =
-          '<defs><linearGradient id="degrade" x1="0" y1="0" x2="0" y2="1">' +
-          '<stop offset="0%" class="deg-haut"/><stop offset="100%" class="deg-bas"/>' +
-          '</linearGradient></defs>' +
-          '<path d="' + aire + '" fill="url(#degrade)"/>' +
-          '<path d="' + ligne + '" class="trait" fill="none" vector-effect="non-scaling-stroke"/>' +
-          '<line id="viseur" y1="0" y2="' + H + '" class="repere-tige" ' +
-          'vector-effect="non-scaling-stroke" style="display:none"/>';
+        // Plus haut et plus bas : deux points qu'on cherche toujours.
+        [[vals.indexOf(max), 'haut'], [vals.indexOf(min), 'bas']].forEach(function (e) {
+          var i = e[0];
+          svg.push('<circle class="extremum" cx="' + x(i).toFixed(1) + '" cy="' + y(points[i][1]).toFixed(1) + '" r="3.5"/>');
+          svg.push('<text class="etiq-extremum" x="' + x(i).toFixed(1) + '" y="' +
+                   (y(points[i][1]) + (e[1] === 'haut' ? -10 : 18)).toFixed(1) + '" text-anchor="middle">' +
+                   nb(points[i][1], 2) + '</text>');
+        });
 
-        document.getElementById('axe-bas').textContent = nb(bas, 2);
-        document.getElementById('axe-haut').textContent = nb(haut, 2);
+        // Les arrêtés comptables, coloriés par verdict : c'est ce qui
+        // distingue ce graphique de n'importe quel graphique boursier.
+        var reperes = 0;
+        JALONS.forEach(function (iso, n) {
+          var i = points.findIndex(function (p) { return p[0] >= iso; });
+          if (i < 1) return;
+          reperes++;
+          svg.push('<line class="repere-tige rv-' + VERDICTS[n] + '" x1="' + x(i).toFixed(1) +
+                   '" x2="' + x(i).toFixed(1) + '" y1="' + y(points[i][1]).toFixed(1) +
+                   '" y2="' + (H - MB) + '" vector-effect="non-scaling-stroke"/>');
+          svg.push('<circle class="repere rv-' + VERDICTS[n] + '" cx="' + x(i).toFixed(1) +
+                   '" cy="' + y(points[i][1]).toFixed(1) + '" r="5.5"/>');
+          svg.push('<text class="etiq-repere" x="' + x(i).toFixed(1) + '" y="' + (H - MB + 16) +
+                   '" text-anchor="middle">' + iso.slice(0, 4) + '</text>');
+        });
+        document.getElementById('legende-verdicts').hidden = reperes === 0;
+
+        // Curseur de lecture.
+        svg.push('<line id="viseur" class="viseur" y1="' + MH + '" y2="' + (H - MB) + '" style="display:none"/>');
+        svg.push('<circle id="viseur-point" class="viseur-point" r="4" style="display:none"/>');
+        svg.push('<rect id="zone" x="' + MG + '" y="' + MH + '" width="' + (L - MG - MD) +
+                 '" height="' + (H - MH - MB) + '" fill="transparent"/>');
+        svg.push('</svg>');
+
+        hote.innerHTML = svg.join('') +
+          '<div class="infobulle" id="infobulle" hidden></div>';
 
         var ecart = (points[points.length - 1][1] - points[0][1]) / points[0][1];
         variation.textContent = (ecart >= 0 ? '+' : '−') + nb(Math.abs(ecart) * 100, 1) + ' %';
         variation.className = 'section-note num ' + (ecart >= 0 ? 'hausse' : 'baisse');
-        legende.textContent = points[0][0].slice(0, 7) + ' → ' + points[points.length - 1][0].slice(0, 7);
+        periodeLue.textContent = 'du ' + dateLongue(points[0][0]) + ' au ' + dateLongue(points[points.length - 1][0]);
 
-        // Lecture au survol : sans elle, une courbe ne donne qu'une allure.
-        var viseur = document.getElementById('viseur');
-        svg.onmousemove = function (e) {
-          var r = svg.getBoundingClientRect();
-          var i = Math.round(((e.clientX - r.left) / r.width) * (points.length - 1));
-          i = Math.max(0, Math.min(points.length - 1, i));
-          viseur.setAttribute('x1', x(i)); viseur.setAttribute('x2', x(i));
-          viseur.style.display = '';
-          var d = new Date(points[i][0]);
-          curseur.innerHTML = '<strong>' + nb(points[i][1], 2) + ' ' + DEVISE + '</strong> · ' +
-            d.toLocaleDateString('fr-FR', {day: 'numeric', month: 'long', year: 'numeric'});
-        };
-        svg.onmouseleave = function () {
-          viseur.style.display = 'none';
-          curseur.textContent = '';
-        };
+        brancheCurseur(points, x, y);
       }
 
-      function periode(jours) {
-        var source = (jours && jours <= 400 && donnees.journalier.length)
-          ? donnees.journalier : (donnees.hebdomadaire.length ? donnees.hebdomadaire : donnees.journalier);
-        if (!jours) return source;
+      function brancheCurseur(points, x, y) {
+        var svg = hote.querySelector('svg'),
+            viseur = hote.querySelector('#viseur'),
+            point = hote.querySelector('#viseur-point'),
+            bulle = hote.querySelector('#infobulle'),
+            zone = hote.querySelector('#zone');
+        if (!zone) return;
+
+        function lire(e) {
+          var r = svg.getBoundingClientRect();
+          var frac = (e.clientX - r.left) / r.width;
+          var i = Math.round(((frac * L) - MG) / (L - MG - MD) * (points.length - 1));
+          i = Math.max(0, Math.min(points.length - 1, i));
+
+          viseur.setAttribute('x1', x(i)); viseur.setAttribute('x2', x(i));
+          viseur.style.display = '';
+          point.setAttribute('cx', x(i)); point.setAttribute('cy', y(points[i][1]));
+          point.style.display = '';
+
+          bulle.hidden = false;
+          bulle.innerHTML = '<strong>' + nb(points[i][1], 2) + ' ' + DEVISE + '</strong>' +
+                            '<span>' + dateLongue(points[i][0]) + '</span>';
+          // L'infobulle suit le curseur mais reste dans le cadre.
+          var gauche = Math.min(Math.max(x(i) / L * r.width - 60, 4), r.width - 130);
+          bulle.style.left = gauche + 'px';
+        }
+
+        svg.addEventListener('mousemove', lire);
+        svg.addEventListener('touchmove', function (e) {
+          if (e.touches[0]) { lire(e.touches[0]); e.preventDefault(); }
+        }, {passive: false});
+        svg.addEventListener('mouseleave', function () {
+          viseur.style.display = 'none';
+          point.style.display = 'none';
+          bulle.hidden = true;
+        });
+      }
+
+      function fenetre(j) {
+        // Sous quinze mois, le pas journalier ; au-delà, l'hebdomadaire
+        // suffit et pèse trois fois moins.
+        var source = (j && j <= 460 && donnees.journalier.length)
+          ? donnees.journalier
+          : (donnees.hebdomadaire.length ? donnees.hebdomadaire : donnees.journalier);
+        if (!j) return source;
         var limite = new Date();
-        limite.setDate(limite.getDate() - jours);
+        limite.setDate(limite.getDate() - j);
         var iso = limite.toISOString().slice(0, 10);
         var coupe = source.filter(function (p) { return p[0] >= iso; });
         return coupe.length > 1 ? coupe : source;
+      }
+
+      function affiche() {
+        if (donnees) return dessine(fenetre(jours));
+        hote.classList.add('chargement');
+        fetch('/api/cours/' + encodeURIComponent(TICKER) + '.json')
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            donnees = d;
+            hote.classList.remove('chargement');
+            dessine(fenetre(jours));
+          })
+          .catch(function () {
+            hote.classList.remove('chargement');
+            hote.innerHTML = '<p class="graphique-note">Historique de cours indisponible.</p>';
+          });
       }
 
       barre.addEventListener('click', function (e) {
@@ -179,17 +296,11 @@
         if (!bouton) return;
         barre.querySelectorAll('button').forEach(function (b) { b.classList.remove('on'); });
         bouton.classList.add('on');
-        curseur.textContent = 'Chargement…';
-
-        var jours = parseInt(bouton.dataset.jours, 10);
-        var suite = function () { curseur.textContent = ''; dessine(periode(jours)); };
-
-        if (donnees) return suite();
-        fetch('/api/cours/' + encodeURIComponent(TICKER) + '.json')
-          .then(function (r) { return r.json(); })
-          .then(function (d) { donnees = d; suite(); })
-          .catch(function () { curseur.textContent = 'Historique indisponible.'; });
+        jours = parseInt(bouton.dataset.jours, 10);
+        affiche();
       });
+
+      affiche();
     })();
     </script>
   {% endif %}

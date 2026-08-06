@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "icones.html" import icone, pays %}
 {% block titre %}Screener{% endblock %}
 
 {#- Un seul endroit où l'on construit les liens : chaque filtre doit
@@ -29,9 +30,9 @@
     </p>
     <div class="heros-meta">
       {%- set places_musulmanes = toutes_places.values() | selectattr('region', 'equalto', 'monde-musulman') | list | length -%}
-      <span class="jeton">🇫🇷 <strong>Paris</strong> — la place de référence</span>
-      <span class="jeton">🕌 <strong>{{ places_musulmanes }} places</strong> du monde musulman</span>
-      <span class="jeton">📊 <strong>{{ standards | length }} standards</strong> comparés côte à côte</span>
+      <span class="jeton">{{ pays("FR", "europe") }} <strong>Paris</strong> — la place de référence</span>
+      <span class="jeton">{{ icone("croissant", 15) }} <strong>{{ places_musulmanes }} places</strong> du monde musulman</span>
+      <span class="jeton">{{ icone("valeurs", 15) }} <strong>{{ standards | length }} standards</strong> comparés côte à côte</span>
     </div>
   </section>
 
@@ -66,7 +67,7 @@
         <span class="ruban-titre">Place</span>
         {% for p in places %}
           <a class="pastille {% if place == p.id %}on{% endif %}" href="{{ lien(plc=p.id) }}">
-            <span class="drapeau">{{ p.drapeau }}</span> {{ p.nom }} <span class="compte">{{ p.compte }}</span>
+            {{ pays(p.code, p.region) }} {{ p.nom }} <span class="compte">{{ p.compte }}</span>
           </a>
         {% endfor %}
       </div>
@@ -76,7 +77,7 @@
   {% if place %}
     <div class="encart encart-info">
       <p>
-        <strong>{{ toutes_places[place].drapeau }} {{ toutes_places[place].nom }}</strong> —
+        {{ pays(toutes_places[place].code, toutes_places[place].region) }} <strong>{{ toutes_places[place].nom }}</strong> —
         {{ toutes_places[place].pays }}, {{ toutes_places[place].indice }},
         coté en {{ toutes_places[place].devise }}.
         {% if toutes_places[place].note %}{{ toutes_places[place].note }}{% endif %}
@@ -159,7 +160,7 @@
                 {% if p %}
                   <span class="place-tag">
                     <span class="place-pip p-{{ p.region }}"></span>
-                    <span class="drapeau">{{ p.drapeau }}</span> {{ p.nom }}
+                    {{ pays(p.code, p.region) }} {{ p.nom }}
                   </span>
                 {% else %}<span class="secteur">—</span>{% endif %}
               </td>

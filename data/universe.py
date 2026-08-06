@@ -379,77 +379,77 @@ JOHANNESBURG = [
 PLACES = {
     # Europe
     "paris": {
-        "nom": "Paris", "pays": "France", "drapeau": "🇫🇷", "devise": "EUR",
+        "nom": "Paris", "pays": "France", "code": "FR", "devise": "EUR",
         "region": "europe", "indice": "CAC 40 · SBF 120",
         "note": "La place de référence de Tayyib, et la seule éligible au PEA.",
         "valeurs": PARIS,
     },
     "amsterdam": {
-        "nom": "Amsterdam", "pays": "Pays-Bas", "drapeau": "🇳🇱", "devise": "EUR",
+        "nom": "Amsterdam", "pays": "Pays-Bas", "code": "NL", "devise": "EUR",
         "region": "europe", "indice": "AEX", "valeurs": AMSTERDAM,
     },
     "bruxelles": {
-        "nom": "Bruxelles", "pays": "Belgique", "drapeau": "🇧🇪", "devise": "EUR",
+        "nom": "Bruxelles", "pays": "Belgique", "code": "BE", "devise": "EUR",
         "region": "europe", "indice": "BEL 20", "valeurs": BRUXELLES,
     },
     "zurich": {
-        "nom": "Zurich", "pays": "Suisse", "drapeau": "🇨🇭", "devise": "CHF",
+        "nom": "Zurich", "pays": "Suisse", "code": "CH", "devise": "CHF",
         "region": "europe", "indice": "SMI", "valeurs": ZURICH,
     },
     "francfort": {
-        "nom": "Francfort", "pays": "Allemagne", "drapeau": "🇩🇪", "devise": "EUR",
+        "nom": "Francfort", "pays": "Allemagne", "code": "DE", "devise": "EUR",
         "region": "europe", "indice": "DAX · MDAX", "valeurs": FRANCFORT,
     },
     "londres": {
-        "nom": "Londres", "pays": "Royaume-Uni", "drapeau": "🇬🇧", "devise": "GBp",
+        "nom": "Londres", "pays": "Royaume-Uni", "code": "GB", "devise": "GBp",
         "region": "europe", "indice": "FTSE 100", "valeurs": LONDRES,
     },
     "milan": {
-        "nom": "Milan", "pays": "Italie", "drapeau": "🇮🇹", "devise": "EUR",
+        "nom": "Milan", "pays": "Italie", "code": "IT", "devise": "EUR",
         "region": "europe", "indice": "FTSE MIB", "valeurs": MILAN,
     },
     "madrid": {
-        "nom": "Madrid", "pays": "Espagne", "drapeau": "🇪🇸", "devise": "EUR",
+        "nom": "Madrid", "pays": "Espagne", "code": "ES", "devise": "EUR",
         "region": "europe", "indice": "IBEX 35", "valeurs": MADRID,
     },
     "lisbonne": {
-        "nom": "Lisbonne", "pays": "Portugal", "drapeau": "🇵🇹", "devise": "EUR",
+        "nom": "Lisbonne", "pays": "Portugal", "code": "PT", "devise": "EUR",
         "region": "europe", "indice": "PSI", "valeurs": LISBONNE,
     },
     "vienne": {
-        "nom": "Vienne", "pays": "Autriche", "drapeau": "🇦🇹", "devise": "EUR",
+        "nom": "Vienne", "pays": "Autriche", "code": "AT", "devise": "EUR",
         "region": "europe", "indice": "ATX", "valeurs": VIENNE,
     },
     "dublin": {
-        "nom": "Dublin", "pays": "Irlande", "drapeau": "🇮🇪", "devise": "EUR",
+        "nom": "Dublin", "pays": "Irlande", "code": "IE", "devise": "EUR",
         "region": "europe", "indice": "ISEQ", "valeurs": DUBLIN,
     },
     "stockholm": {
-        "nom": "Stockholm", "pays": "Suède", "drapeau": "🇸🇪", "devise": "SEK",
+        "nom": "Stockholm", "pays": "Suède", "code": "SE", "devise": "SEK",
         "region": "europe", "indice": "OMXS30", "valeurs": STOCKHOLM,
     },
     "copenhague": {
-        "nom": "Copenhague", "pays": "Danemark", "drapeau": "🇩🇰", "devise": "DKK",
+        "nom": "Copenhague", "pays": "Danemark", "code": "DK", "devise": "DKK",
         "region": "europe", "indice": "OMXC25", "valeurs": COPENHAGUE,
     },
     "oslo": {
-        "nom": "Oslo", "pays": "Norvège", "drapeau": "🇳🇴", "devise": "NOK",
+        "nom": "Oslo", "pays": "Norvège", "code": "NO", "devise": "NOK",
         "region": "europe", "indice": "OBX", "valeurs": OSLO,
     },
     "varsovie": {
-        "nom": "Varsovie", "pays": "Pologne", "drapeau": "🇵🇱", "devise": "PLN",
+        "nom": "Varsovie", "pays": "Pologne", "code": "PL", "devise": "PLN",
         "region": "europe", "indice": "WIG20", "valeurs": VARSOVIE,
     },
 
     # Amériques
     "new-york": {
-        "nom": "New York", "pays": "États-Unis", "drapeau": "🇺🇸", "devise": "USD",
+        "nom": "New York", "pays": "États-Unis", "code": "US", "devise": "USD",
         "region": "ameriques", "indice": "S&P 500 · Nasdaq",
         "note": "La place la mieux couverte au monde, et celle où les screeners concurrents s'arrêtent.",
         "valeurs": NEW_YORK,
     },
     "toronto": {
-        "nom": "Toronto", "pays": "Canada", "drapeau": "🇨🇦", "devise": "CAD",
+        "nom": "Toronto", "pays": "Canada", "code": "CA", "devise": "CAD",
         "region": "ameriques", "indice": "S&P/TSX",
         "note": "Utile aux francophones du Québec.",
         "valeurs": TORONTO,
@@ -457,62 +457,62 @@ PLACES = {
 
     # Monde musulman
     "riyad": {
-        "nom": "Riyad", "pays": "Arabie saoudite", "drapeau": "🇸🇦", "devise": "SAR",
+        "nom": "Riyad", "pays": "Arabie saoudite", "code": "SA", "devise": "SAR",
         "region": "monde-musulman", "indice": "Tadawul · TASI",
         "note": "La plus grande place du monde musulman, et la mieux documentée par Yahoo.",
         "valeurs": RIYAD,
     },
     "doha": {
-        "nom": "Doha", "pays": "Qatar", "drapeau": "🇶🇦", "devise": "QAR",
+        "nom": "Doha", "pays": "Qatar", "code": "QA", "devise": "QAR",
         "region": "monde-musulman", "indice": "QE Index", "valeurs": DOHA,
     },
     "koweit": {
-        "nom": "Koweït", "pays": "Koweït", "drapeau": "🇰🇼", "devise": "KWD",
+        "nom": "Koweït", "pays": "Koweït", "code": "KW", "devise": "KWD",
         "region": "monde-musulman", "indice": "Boursa Kuwait", "valeurs": KOWEIT,
     },
     "emirats": {
-        "nom": "Dubaï & Abu Dhabi", "pays": "Émirats arabes unis", "drapeau": "🇦🇪",
+        "nom": "Dubaï & Abu Dhabi", "pays": "Émirats arabes unis", "code": "AE",
         "devise": "AED", "region": "monde-musulman", "indice": "DFM · ADX",
         "note": "Yahoo réunit les deux places sous le suffixe .AE ; la couverture est inégale.",
         "valeurs": EMIRATS,
     },
     "istanbul": {
-        "nom": "Istanbul", "pays": "Turquie", "drapeau": "🇹🇷", "devise": "TRY",
+        "nom": "Istanbul", "pays": "Turquie", "code": "TR", "devise": "TRY",
         "region": "monde-musulman", "indice": "BIST 100", "valeurs": ISTANBUL,
     },
     "kuala-lumpur": {
-        "nom": "Kuala Lumpur", "pays": "Malaisie", "drapeau": "🇲🇾", "devise": "MYR",
+        "nom": "Kuala Lumpur", "pays": "Malaisie", "code": "MY", "devise": "MYR",
         "region": "monde-musulman", "indice": "FTSE Bursa Malaysia KLCI",
         "note": "Le pays où la finance islamique est la plus institutionnalisée.",
         "valeurs": KUALA_LUMPUR,
     },
     "jakarta": {
-        "nom": "Jakarta", "pays": "Indonésie", "drapeau": "🇮🇩", "devise": "IDR",
+        "nom": "Jakarta", "pays": "Indonésie", "code": "ID", "devise": "IDR",
         "region": "monde-musulman", "indice": "IDX Composite",
         "note": "Le plus grand pays musulman du monde par la population.",
         "valeurs": JAKARTA,
     },
     "le-caire": {
-        "nom": "Le Caire", "pays": "Égypte", "drapeau": "🇪🇬", "devise": "EGP",
+        "nom": "Le Caire", "pays": "Égypte", "code": "EG", "devise": "EGP",
         "region": "monde-musulman", "indice": "EGX 30",
         "note": "Yahoo ne renseigne pas le secteur d'activité : ces valeurs tombent en « à vérifier ».",
         "valeurs": LE_CAIRE,
     },
     "karachi": {
-        "nom": "Karachi", "pays": "Pakistan", "drapeau": "🇵🇰", "devise": "PKR",
+        "nom": "Karachi", "pays": "Pakistan", "code": "PK", "devise": "PKR",
         "region": "monde-musulman", "indice": "KSE 100",
         "note": "Yahoo ne renseigne pas le secteur d'activité : ces valeurs tombent en « à vérifier ».",
         "valeurs": KARACHI,
     },
     # Asie & Afrique
     "mumbai": {
-        "nom": "Mumbai", "pays": "Inde", "drapeau": "🇮🇳", "devise": "INR",
+        "nom": "Mumbai", "pays": "Inde", "code": "IN", "devise": "INR",
         "region": "asie-afrique", "indice": "NIFTY 50",
         "note": "Deuxième population musulmane du monde.",
         "valeurs": MUMBAI,
     },
     "johannesburg": {
-        "nom": "Johannesburg", "pays": "Afrique du Sud", "drapeau": "🇿🇦", "devise": "ZAR",
+        "nom": "Johannesburg", "pays": "Afrique du Sud", "code": "ZA", "devise": "ZAR",
         "region": "asie-afrique", "indice": "JSE Top 40", "valeurs": JOHANNESBURG,
     },
 }
@@ -523,14 +523,14 @@ PLACES = {
 # absence annoncée vaut mieux qu'une absence constatée par l'utilisateur.
 PLACES_ABSENTES = [
     {
-        "nom": "BRVM (Abidjan)", "drapeau": "🌍",
+        "nom": "BRVM (Abidjan)", "code": "UEMOA",
         "pays": "Bénin, Burkina Faso, Côte d'Ivoire, Guinée-Bissau, Mali, Niger, Sénégal, Togo",
         "raison": "Aucun symbole BRVM n'existe chez Yahoo Finance : ni cotation, "
                   "ni bilan, ni capitalisation. C'est l'absence qui nous coûte le "
                   "plus, puisqu'elle prive huit pays francophones d'un screening.",
     },
     {
-        "nom": "Casablanca", "drapeau": "🇲🇦", "pays": "Maroc",
+        "nom": "Casablanca", "code": "MA", "pays": "Maroc",
         "raison": "Le suffixe `.CS` n'est pas servi par Yahoo Finance. "
                   "La source ne le dit pas franchement — elle répond « Too Many "
                   "Requests », ce qui ressemble à une limitation passagère. "
@@ -540,15 +540,15 @@ PLACES_ABSENTES = [
                   "que d'afficher un Maroc perpétuellement vide.",
     },
     {
-        "nom": "Tunis", "drapeau": "🇹🇳", "pays": "Tunisie",
+        "nom": "Tunis", "code": "TN", "pays": "Tunisie",
         "raison": "Place absente de Yahoo Finance.",
     },
     {
-        "nom": "Lagos", "drapeau": "🇳🇬", "pays": "Nigeria",
+        "nom": "Lagos", "code": "NG", "pays": "Nigeria",
         "raison": "Place absente de Yahoo Finance.",
     },
     {
-        "nom": "Mascate & Manama", "drapeau": "🕌", "pays": "Oman, Bahreïn",
+        "nom": "Mascate & Manama", "code": "OM·BH", "pays": "Oman, Bahreïn",
         "raison": "Cotations partielles, sans états financiers exploitables.",
     },
 ]

@@ -558,9 +558,48 @@ h2.section {
 .baisse { color: var(--rouge); }
 
 .graphique { padding: 18px 19px 15px; }
-/* La courbe est étirée en largeur (preserveAspectRatio="none") : sans
-   vector-effect, le trait s'épaissirait avec elle. */
-.courbe { width: 100%; height: 210px; display: block; }
+
+/* Le graphique porte désormais ses propres axes : il garde donc son rapport
+   de forme, sinon les libellés se déformeraient avec lui. Seul le tracé
+   conserve `vector-effect`, pour que le trait ne s'épaississe pas. */
+.graphe-hote { position: relative; }
+.courbe { width: 100%; height: auto; display: block; overflow: visible; }
+.graphe-hote.chargement { min-height: 210px; opacity: .5; }
+
+.grille { stroke: var(--bord); stroke-width: 1; }
+.axe-y {
+  fill: var(--texte-faible); font-size: 13px; font-variant-numeric: tabular-nums;
+  dominant-baseline: middle;
+}
+.axe-x { fill: var(--texte-faible); font-size: 13px; }
+
+.extremum { fill: var(--texte-doux); }
+.etiq-extremum {
+  fill: var(--texte-doux); font-size: 12.5px; font-weight: 620;
+  font-variant-numeric: tabular-nums;
+}
+.etiq-repere { fill: var(--texte-faible); font-size: 11.5px; font-weight: 600; }
+
+.viseur { stroke: var(--texte-faible); stroke-width: 1; stroke-dasharray: 3 3; }
+.viseur-point { fill: var(--jade); stroke: var(--surface); stroke-width: 2.5; }
+#zone { cursor: crosshair; }
+
+.infobulle {
+  position: absolute; top: 6px; pointer-events: none;
+  background: var(--texte); color: var(--surface);
+  border-radius: var(--rayon-s); padding: 7px 11px;
+  font-size: 12.5px; line-height: 1.35; box-shadow: var(--ombre-forte);
+  white-space: nowrap; display: flex; flex-direction: column; gap: 1px;
+}
+.infobulle strong { font-size: 14px; font-weight: 680; font-variant-numeric: tabular-nums; }
+.infobulle span { opacity: .72; }
+.infobulle[hidden] { display: none; }
+
+.graphique-periode {
+  font-size: 12.5px; color: var(--texte-faible); margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.graphique-legende[hidden] { display: none; }
 .trait { stroke: var(--jade); stroke-width: 1.9; stroke-linejoin: round; }
 .deg-haut { stop-color: var(--jade); stop-opacity: .26; }
 .deg-bas { stop-color: var(--jade); stop-opacity: 0; }
@@ -691,6 +730,40 @@ td.depasse { color: var(--rouge); }
 }
 
 
+/* --- Icônes et pastilles de pays ---------------------------------------- */
+/* Le produit n'utilise aucun emoji. Rendu différent sur chaque système,
+   couleur imposée, registre familier là où l'on parle de patrimoine : ils
+   font « application gratuite » plus sûrement que n'importe quel défaut de
+   mise en page. Des tracés au trait héritent de leur contexte et restent
+   nets à toute taille. */
+
+.ic { flex-shrink: 0; vertical-align: -0.18em; }
+
+.pays {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 26px; height: 18px; padding: 0 5px;
+  border-radius: 4px; background: var(--surface-3); color: var(--texte-doux);
+  font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+  font-variant-numeric: normal; flex-shrink: 0;
+}
+.pays-europe { background: var(--europe-fond); color: var(--europe); }
+.pays-ameriques { background: var(--ameriques-fond); color: var(--ameriques); }
+.pays-monde-musulman { background: var(--musulman-fond); color: var(--musulman); }
+.pays-asie-afrique { background: var(--asie-fond); color: var(--asie); }
+
+/* Sur la fiche de place, la pastille tient lieu d'écusson. */
+.place-ecusson {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 56px; height: 56px; border-radius: 14px;
+  font-size: 19px; font-weight: 720; letter-spacing: .02em;
+  background: var(--surface-3); color: var(--texte-doux);
+}
+.place-ecusson.pays-europe { background: var(--europe-fond); color: var(--europe); }
+.place-ecusson.pays-ameriques { background: var(--ameriques-fond); color: var(--ameriques); }
+.place-ecusson.pays-monde-musulman { background: var(--musulman-fond); color: var(--musulman); }
+.place-ecusson.pays-asie-afrique { background: var(--asie-fond); color: var(--asie); }
+
+
 /* --- Recherche globale ------------------------------------------------- */
 /* Une seule entrée pour tout atteindre — une valeur, une place, un secteur,
    une page. Le lecteur qui cherche « Aramco » ou « Kuala Lumpur » ne devrait
@@ -797,8 +870,17 @@ td.depasse { color: var(--rouge); }
 .bs-ligne:last-child { border-radius: 0 0 var(--rayon) var(--rayon); }
 .bs-ligne + .bs-ligne { border-top: 0; }
 .bs-nom { flex: 0 0 130px; font-size: 13.5px; font-weight: 560; }
-.bs-piste { flex: 1; height: 9px; background: var(--surface-3); border-radius: 5px; overflow: hidden; }
-.bs-part { height: 100%; background: linear-gradient(90deg, var(--vert), var(--jade)); border-radius: 5px; }
+/* `display: block` sur la piste et la part : ce sont des `span`, donc en
+   ligne par défaut, et la largeur d'un élément en ligne est ignorée — la
+   barre restait vide malgré un pourcentage correct. */
+.bs-piste {
+  flex: 1; display: block; height: 9px;
+  background: var(--surface-3); border-radius: 5px; overflow: hidden;
+}
+.bs-part {
+  display: block; height: 100%; border-radius: 5px;
+  background: linear-gradient(90deg, var(--vert), var(--jade));
+}
 .bs-val { flex: 0 0 78px; text-align: right; font-size: 13.5px; font-weight: 660; font-variant-numeric: tabular-nums; }
 
 
@@ -864,10 +946,13 @@ td.depasse { color: var(--rouge); }
 .selecteur:focus { outline: none; border-color: var(--jade); box-shadow: 0 0 0 3.5px var(--jade-fond); }
 
 .bouton {
+  display: inline-flex; align-items: center; gap: 7px;
   padding: 11px 20px; border: 0; border-radius: var(--rayon-pill);
   background: linear-gradient(135deg, var(--jade), var(--jade-fonce));
   color: #fff; font: inherit; font-size: 14px; font-weight: 620;
   cursor: pointer; white-space: nowrap; box-shadow: var(--ombre);
+  /* Le bouton est parfois un lien : sans cela il hérite du soulignement. */
+  text-decoration: none;
   transition: filter .13s, transform .13s;
 }
 .bouton:hover { filter: brightness(1.07); transform: translateY(-1px); }
