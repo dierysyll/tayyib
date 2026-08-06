@@ -1,19 +1,20 @@
 {% extends "base.html" %}
 {% block titre %}Zakat{% endblock %}
-{% block description %}Calculez la zakat due sur votre portefeuille d'actions : assiette selon l'intention de détention, nissab en or ou en argent au cours du jour, taux de 2,5 %.{% endblock %}
+{% block description %}Calculez la zakat due sur votre patrimoine : actions, épargne en francs CFA, dirhams, dinars ou autres devises, or et argent physiques. Nissab au cours du jour, taux de 2,5 %.{% endblock %}
 
 {% block contenu %}
 <main class="page page-etroite">
 
-  <h1 class="titre-page">Zakat sur un portefeuille d'actions</h1>
+  <h1 class="titre-page">Zakat sur votre patrimoine</h1>
   <p class="chapeau">
     La zakat est due chaque année lunaire sur un patrimoine qui dépasse le nissab.
-    Sur des actions, la difficulté n'est pas le taux — il est de 2,5 % — mais
-    l'assiette : ce sur quoi il s'applique dépend de la raison pour laquelle vous
-    détenez ces titres.
+    Le taux ne fait pas difficulté — il est de 2,5 % — l'assiette si : elle dépend
+    de ce que vous détenez, et de la raison pour laquelle vous le détenez.
+    Actions, épargne en francs CFA ou en dirhams, or physique : tout se compte
+    ici, dans sa devise d'origine.
   </p>
 
-  <h2 class="section">1. Votre intention de détention</h2>
+  <h2 class="section">1. Si vous détenez des actions : votre intention</h2>
   <div class="calc">
     <div class="calc-champs">
       <div class="champ" style="flex-basis:100%">
@@ -42,7 +43,7 @@
     l'AAOIFI recommande de retenir les stocks également, que Yahoo ne publie pas.</p>
   </div>
 
-  <h2 class="section">2. Votre portefeuille</h2>
+  <h2 class="section">2. Vos actions</h2>
   <div class="cadre">
     <p class="vide" id="pf-vide">
       Aucune ligne enregistrée. Ajoutez vos positions depuis la page
@@ -65,22 +66,43 @@
     </div>
   </div>
 
-  <div class="calc" style="margin-top:14px">
+  <h2 class="section">3. Vos autres avoirs</h2>
+  <p class="chapeau">
+    La zakat porte sur un patrimoine, pas sur un portefeuille. Espèces,
+    comptes, épargne, or physique : saisissez chaque avoir dans sa propre
+    devise, la conversion est faite pour vous.
+  </p>
+
+  <div class="calc">
+    <div id="avoirs"></div>
+    <button type="button" class="bouton bouton-fantome" id="ajouter-avoir">+ Ajouter un avoir</button>
+    <p class="champ-aide" style="margin-top:12px">
+      Le franc CFA est arrimé à l'euro à parité fixe (655,957). Les autres
+      taux viennent de la dernière collecte.
+    </p>
+  </div>
+
+  <div class="calc" style="margin-top:12px">
     <div class="calc-champs">
       <div class="champ">
-        <label for="autres">Autres avoirs zakatables (€)</label>
-        <input type="number" id="autres" min="0" step="0.01" placeholder="épargne, or, espèces…">
-        <p class="champ-aide">Comptes courants, épargne, or physique, créances sur autrui.</p>
+        <label for="dettes">Dettes exigibles</label>
+        <input type="number" id="dettes" min="0" step="0.01" placeholder="0">
+        <p class="champ-aide">Montant en euros, à déduire de l'assiette.</p>
       </div>
       <div class="champ">
-        <label for="dettes">Dettes exigibles (€)</label>
-        <input type="number" id="dettes" min="0" step="0.01" placeholder="à déduire">
-        <p class="champ-aide">Les dettes échues, à déduire de l'assiette.</p>
+        <label for="or-g">Or physique détenu (grammes)</label>
+        <input type="number" id="or-g" min="0" step="0.1" placeholder="ex. 120">
+        <p class="champ-aide" id="aide-or">Bijoux et lingots, valorisés au cours du jour.</p>
+      </div>
+      <div class="champ">
+        <label for="argent-g">Argent physique détenu (grammes)</label>
+        <input type="number" id="argent-g" min="0" step="1" placeholder="ex. 800">
+        <p class="champ-aide" id="aide-argent"></p>
       </div>
     </div>
   </div>
 
-  <h2 class="section">3. Le nissab</h2>
+  <h2 class="section">4. Le nissab</h2>
   {% if metaux and (metaux.nissab_or or metaux.nissab_argent) %}
     <div class="calc">
       <div class="calc-champs">
@@ -124,7 +146,7 @@
     </div>
   {% endif %}
 
-  <h2 class="section">4. Zakat due</h2>
+  <h2 class="section">5. Zakat due</h2>
   <div class="verdict-geant">
     <div class="vg-case">
       <div class="vg-lb">Assiette retenue</div>
@@ -153,13 +175,17 @@
   </div>
 
 </main>
-
 <script>
-// Aucun envoi au serveur : les lignes viennent du stockage local, comme
-// sur les pages Portefeuille et Purification.
+// Aucun envoi au serveur : les lignes du portefeuille viennent du stockage
+// local, et les avoirs saisis ici n'en sortent pas non plus.
 (function () {
   var CLE = 'tayyib.portefeuille.v1';
+  var CLE_AVOIRS = 'tayyib.avoirs.v1';
   var TAUX_ZAKAT = 0.025;
+
+  var DEVISES = {{ devises | tojson }};
+  var TAUX = {{ taux | tojson }};
+  var METAUX = {{ (metaux or {}) | tojson }};
 
   var univers = {}, lignes = [];
 
@@ -167,9 +193,13 @@
     return n.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
   }
 
-  function charge() {
-    try { return JSON.parse(localStorage.getItem(CLE)) || []; }
-    catch (e) { return []; }
+  function lire(cle, defaut) {
+    try { return JSON.parse(localStorage.getItem(cle)) || defaut; }
+    catch (e) { return defaut; }
+  }
+
+  function ecrire(cle, valeur) {
+    try { localStorage.setItem(cle, JSON.stringify(valeur)); } catch (e) {}
   }
 
   var elIntention = document.getElementById('intention'),
@@ -177,8 +207,11 @@
       elLignes = document.getElementById('pf-lignes'),
       elTable = document.getElementById('pf-table'),
       elVide = document.getElementById('pf-vide'),
-      elAutres = document.getElementById('autres'),
+      elAvoirs = document.getElementById('avoirs'),
+      elAjouter = document.getElementById('ajouter-avoir'),
       elDettes = document.getElementById('dettes'),
+      elOr = document.getElementById('or-g'),
+      elArgent = document.getElementById('argent-g'),
       elNissab = document.getElementById('nissab') || document.getElementById('nissab-manuel');
 
   var AIDES = {
@@ -186,6 +219,85 @@
     long: "L'assiette est votre quote-part des actifs zakatables de chaque société, approchée par la part de trésorerie et de créances au bilan."
   };
 
+  // --- Avoirs en devises -------------------------------------------------
+  // Chaque ligne est un montant dans une devise. On convertit en euros pour
+  // additionner : une épargne en francs CFA et un compte en dirhams ne
+  // s'ajoutent pas tels quels.
+  var avoirs = lire(CLE_AVOIRS, [{montant: '', devise: 'EUR'}]);
+
+  function rendAvoirs() {
+    elAvoirs.innerHTML = '';
+    avoirs.forEach(function (a, idx) {
+      var bloc = document.createElement('div');
+      bloc.className = 'calc-champs';
+      bloc.style.marginBottom = '12px';
+
+      var options = DEVISES.map(function (d) {
+        return '<option value="' + d.code + '"' + (d.code === a.devise ? ' selected' : '') +
+               '>' + d.code + ' — ' + d.nom + '</option>';
+      }).join('');
+
+      bloc.innerHTML =
+        '<div class="champ"><label>Montant</label>' +
+        '<input type="number" min="0" step="0.01" value="' + (a.montant || '') + '" data-i="' + idx + '" data-champ="montant" placeholder="0"></div>' +
+        '<div class="champ"><label>Devise</label><select data-i="' + idx + '" data-champ="devise">' + options + '</select></div>' +
+        '<div class="champ" style="flex:0 0 auto"><label>&nbsp;</label>' +
+        '<button type="button" class="lien-bouton" data-retirer="' + idx + '" style="padding:10px 0">Retirer</button></div>' +
+        '<div class="calc-sortie"><div class="cs-lb">En euros</div>' +
+        '<div class="cs-val">' + euro(enEuros(a)) + '</div></div>';
+
+      elAvoirs.appendChild(bloc);
+    });
+
+    elAvoirs.querySelectorAll('input[data-champ], select[data-champ]').forEach(function (el) {
+      el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', function () {
+        avoirs[+el.dataset.i][el.dataset.champ] = el.value;
+        ecrire(CLE_AVOIRS, avoirs);
+        rendAvoirs();
+        rendre();
+      });
+    });
+    elAvoirs.querySelectorAll('[data-retirer]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        avoirs.splice(+b.dataset.retirer, 1);
+        if (!avoirs.length) avoirs.push({montant: '', devise: 'EUR'});
+        ecrire(CLE_AVOIRS, avoirs);
+        rendAvoirs();
+        rendre();
+      });
+    });
+  }
+
+  function enEuros(a) {
+    var m = parseFloat(a.montant);
+    var t = TAUX[a.devise];
+    if (!isFinite(m) || !t) return 0;
+    return m / t;
+  }
+
+  elAjouter.addEventListener('click', function () {
+    avoirs.push({montant: '', devise: 'EUR'});
+    ecrire(CLE_AVOIRS, avoirs);
+    rendAvoirs();
+  });
+
+  // --- Métaux physiques --------------------------------------------------
+  if (METAUX.or) {
+    document.getElementById('aide-or').textContent =
+      'Bijoux et lingots, valorisés à ' + METAUX.or.toLocaleString('fr-FR') + ' €/g.';
+  }
+  if (METAUX.argent) {
+    document.getElementById('aide-argent').textContent =
+      'Valorisé à ' + METAUX.argent.toLocaleString('fr-FR') + ' €/g.';
+  }
+
+  function valeurMetaux() {
+    var or = (parseFloat(elOr.value) || 0) * (METAUX.or || 0);
+    var ar = (parseFloat(elArgent.value) || 0) * (METAUX.argent || 0);
+    return or + ar;
+  }
+
+  // --- Portefeuille ------------------------------------------------------
   function part_zakatable(v) {
     // Trésorerie + créances rapportées au total du bilan : la fraction de
     // l'entreprise qui est zakatable. Sans bilan, on retombe sur 100 % —
@@ -200,21 +312,16 @@
     elAide.textContent = AIDES[elIntention.value];
 
     var actives = lignes.filter(function (l) { return univers[l.ticker]; });
-
-    if (!actives.length) {
-      elTable.hidden = true; elVide.hidden = false;
-    } else {
-      elTable.hidden = false; elVide.hidden = true;
-    }
+    elTable.hidden = !actives.length;
+    elVide.hidden = !!actives.length;
 
     elLignes.innerHTML = '';
     var totalActions = 0;
 
     actives.forEach(function (l) {
       var v = univers[l.ticker];
-      // On valorise en euros convertis : additionner une ligne saoudienne
-      // et une ligne parisienne dans leurs devises respectives donnerait un
-      // total dénué de sens.
+      // Valorisé en euros convertis : additionner une ligne saoudienne et
+      // une ligne parisienne dans leurs devises donnerait un total absurde.
       var valeur = (v.prix_eur || 0) * l.qte;
       var part = negoce ? 1 : part_zakatable(v);
       var approx = !negoce && part === null;
@@ -237,14 +344,15 @@
       elLignes.appendChild(tr);
     });
 
-    var autres = parseFloat(elAutres.value) || 0;
+    var autres = avoirs.reduce(function (s, a) { return s + enEuros(a); }, 0);
     var dettes = parseFloat(elDettes.value) || 0;
-    var assiette = Math.max(0, totalActions + autres - dettes);
+    var assiette = Math.max(0, totalActions + autres + valeurMetaux() - dettes);
     var nissab = parseFloat(elNissab && elNissab.value) || 0;
 
     document.getElementById('assiette').textContent = assiette ? euro(assiette) : '—';
     document.getElementById('note-assiette').textContent =
-      negoce ? 'Valeur de marché totale.' : 'Quote-part des actifs zakatables.';
+      (negoce ? 'Valeur de marché des titres' : 'Quote-part zakatable des titres') +
+      ', avoirs et métaux, dettes déduites.';
 
     document.getElementById('nissab-val').textContent = nissab ? euro(nissab) : '—';
 
@@ -253,7 +361,7 @@
 
     if (!assiette || !nissab) {
       elZakat.textContent = '—';
-      elNote.textContent = nissab ? '' : 'Renseignez le nissab.';
+      elNote.textContent = nissab ? 'Renseignez au moins un avoir.' : 'Renseignez le nissab.';
       document.getElementById('note-nissab').textContent = '';
       return;
     }
@@ -273,18 +381,21 @@
     .then(function (r) { return r.json(); })
     .then(function (data) {
       data.valeurs.forEach(function (v) { univers[v.ticker] = v; });
-      lignes = charge();
+      lignes = lire(CLE, []);
       rendre();
     })
     .catch(function () {
       elVide.textContent = 'Univers indisponible : impossible de valoriser le portefeuille.';
+      rendre();
     });
 
-  [elIntention, elAutres, elDettes, elNissab].forEach(function (el) {
+  [elIntention, elDettes, elOr, elArgent, elNissab].forEach(function (el) {
     if (el) el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', rendre);
   });
 
   elAide.textContent = AIDES.negoce;
+  rendAvoirs();
+  rendre();
 })();
 </script>
 {% endblock %}

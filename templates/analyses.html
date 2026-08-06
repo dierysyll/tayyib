@@ -25,13 +25,14 @@
     {{ standard.full }}.
   </p>
 
-  <div class="outils">
-    <div class="segments">
+  <form class="outils" method="get" action="/analyses">
+    <select name="standard" class="selecteur" onchange="this.form.submit()">
       {% for sid, std in standards.items() %}
-        <a href="?standard={{ sid }}" class="{% if sid == standard.id %}on{% endif %}">{{ std.label }}</a>
+        <option value="{{ sid }}" {% if sid == standard.id %}selected{% endif %}>Standard : {{ std.label }}</option>
       {% endfor %}
-    </div>
-  </div>
+    </select>
+    <noscript><button class="bouton" type="submit">Appliquer</button></noscript>
+  </form>
 
   {# --- Les basculements : la vraie exclusivité de cette page ---------- #}
   <h2 class="section">Ce qui a changé au dernier arrêté comptable</h2>
@@ -118,7 +119,7 @@
             {% for c in rendements %}
               {{ ligne_valeur(c.societe, loop.index,
                               (c.rendement * 100) | round(1) | string | replace('.', ',') ~ ' %',
-                              c.societe.industry or c.societe.sector or '—') }}
+                              activite(c.societe) or '—') }}
             {% endfor %}
           </div>
         {% else %}
@@ -141,7 +142,7 @@
             {% for e in tailles %}
               {{ ligne_valeur(e.societe, loop.index,
                               e.societe.market_cap_eur | euros,
-                              e.societe.industry or e.societe.sector or '—') }}
+                              activite(e.societe) or '—') }}
             {% endfor %}
           </div>
         {% else %}
@@ -231,7 +232,13 @@
 
   {# --- Par place ------------------------------------------------------- #}
   <h2 class="section">Taux de conformité par place</h2>
-  <section class="carte">
+  <details class="repli" open>
+    <summary>
+      Les {{ places | length }} places couvertes
+      <span class="repli-compte">{{ total }} valeurs</span>
+    </summary>
+    <div class="repli-corps">
+  <section class="carte" style="border:0;box-shadow:none;border-radius:0">
     <div class="carte-tete">
       <div>
         <h3 class="carte-titre">Où le monde est-il investissable ?</h3>
@@ -278,10 +285,18 @@
       </div>
     </div>
   </section>
+    </div>
+  </details>
 
   {# --- Secteurs -------------------------------------------------------- #}
   <h2 class="section">Les secteurs qui offrent le plus de conformes</h2>
-  <section class="carte">
+  <details class="repli">
+    <summary>
+      Les {{ secteurs | length }} secteurs les mieux dotés
+      <span class="repli-compte">classés par nombre de conformes</span>
+    </summary>
+    <div class="repli-corps">
+  <section class="carte" style="border:0;box-shadow:none;border-radius:0">
     <div class="carte-corps">
       <div class="liste-valeurs">
         {% for s in secteurs %}
@@ -297,6 +312,8 @@
       </div>
     </div>
   </section>
+    </div>
+  </details>
 
   {% if fetched_at %}
     <p class="pied-liens" style="margin-top:22px">Calculé sur les données collectées le {{ fetched_at | date_fr }}.</p>

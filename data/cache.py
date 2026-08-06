@@ -37,6 +37,7 @@ screener instantané quand l'univers grandit.
 
 import json
 import os
+import time
 from datetime import datetime, timezone
 
 CACHE_DIR = os.environ.get(
@@ -259,6 +260,62 @@ def actus():
     except (OSError, json.JSONDecodeError):
         return [], None
     return payload.get("articles", []), _date(payload.get("fetched_at"))
+
+
+# Le fil de presse francophone est stocké à part des dépêches Yahoo : les
+# deux n'ont ni la même source, ni la même fraîcheur, ni le même usage.
+PRESSE_FILE = os.path.join(CACHE_DIR, "presse.json")
+
+
+def save_presse(articles):
+    _ensure_dirs()
+    _ecrire(PRESSE_FILE, {
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "articles": articles,
+    })
+    return PRESSE_FILE
+
+
+def presse():
+    """Renvoie (articles, fetched_at). Fichier absent → ([], None)."""
+    try:
+        with open(PRESSE_FILE, encoding="utf-8") as f:
+            payload = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return [], None
+    return payload.get("articles", []), _date(payload.get("fetched_at"))
+
+
+# --- Cours journaliers ---------------------------------------------------
+#
+# Récupérés à la demande, une valeur à la fois (voir la route /api/cours).
+# Ils vivent dans leur propre dossier plutôt que dans le fichier de détail :
+# on veut pouvoir les périmer — un cours du jour vieillit en un jour — sans
+# toucher aux comptes annuels, qui ne bougent qu'une fois par exercice.
+
+COURS_DIR = os.path.join(CACHE_DIR, "cours")
+
+# Au-delà, on redemande : le dernier point serait d'hier.
+COURS_FRAICHEUR = 12 * 3600
+
+
+def save_cours_journalier(ticker, points):
+    os.makedirs(COURS_DIR, exist_ok=True)
+    chemin = os.path.join(COURS_DIR, _nom_fichier(ticker))
+    _ecrire(chemin, {"ticker": ticker, "points": points})
+    return chemin
+
+
+def cours_journalier(ticker):
+    """Les points journaliers en cache, ou None s'ils manquent ou ont vieilli."""
+    chemin = os.path.join(COURS_DIR, _nom_fichier(ticker))
+    try:
+        if time.time() - os.path.getmtime(chemin) > COURS_FRAICHEUR:
+            return None
+        with open(chemin, encoding="utf-8") as f:
+            return json.load(f).get("points")
+    except (OSError, json.JSONDecodeError):
+        return None
 
 
 def deja_collectes():

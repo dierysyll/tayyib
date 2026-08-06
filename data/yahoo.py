@@ -256,6 +256,31 @@ def fetch(ticker):
     return societe
 
 
+def fetch_cours_journalier(ticker, periode="2y"):
+    """L'historique de cours en pas journalier, pour une seule valeur.
+
+    La collecte de masse se contente d'un point par semaine sur six ans :
+    c'est ce qu'il faut pour situer des arrêtés comptables, et ce serait
+    plus de vingt mégaoctets de cache si on descendait au jour pour mille
+    valeurs. Le pas journalier est donc demandé à la demande, valeur par
+    valeur, quand quelqu'un ouvre une fiche et veut lire un mois.
+
+    Comme pour l'hebdomadaire, `auto_adjust=False` : les cours ajustés
+    rétropropagent les dividendes et déforment le passé.
+    """
+    historique = _appel(
+        yf.Ticker(ticker).history,
+        period=periode, interval="1d", auto_adjust=False,
+    )
+    if historique is None or historique.empty:
+        return []
+    return [
+        [d.date().isoformat(), round(float(c), 4)]
+        for d, c in historique["Close"].items()
+        if c == c
+    ]
+
+
 # --- Actualités -----------------------------------------------------------
 #
 # yfinance a changé la forme de `Ticker.news` en cours de route : l'ancienne

@@ -18,18 +18,29 @@
     screener qui affiche une valeur sans pouvoir la juger ne rend pas service.
   </p>
 
+  {#- Les régions sont repliées et de même rang : l'Europe compte le plus de
+      places, mais elle n'a pas à occuper toute la page devant les autres.
+      Chaque nom de place ouvre sa fiche. -#}
   {% for region in regions %}
-    <h3>{{ region.nom }}</h3>
-    <p>{{ region.resume }}</p>
-    <ul>
-      {% for p in region.places %}
-        <li>
-          <strong>{{ p.drapeau }} {{ p.nom }}</strong> — {{ p.pays }}, {{ p.indice }},
-          coté en {{ p.devise }}{% if p.id not in collectees %} <em>(pas encore collectée)</em>{% endif %}.
-          {% if p.note %}{{ p.note }}{% endif %}
-        </li>
-      {% endfor %}
-    </ul>
+    <details class="repli" {% if loop.first %}open{% endif %}>
+      <summary>
+        {{ region.nom }}
+        <span class="repli-compte">{{ region.places | length }} places</span>
+      </summary>
+      <div class="repli-corps" style="padding:4px 20px 16px">
+        <p>{{ region.resume }}</p>
+        <ul>
+          {% for p in region.places %}
+            <li>
+              <a href="/place/{{ p.id }}"><strong>{{ p.drapeau }} {{ p.nom }}</strong></a> —
+              {{ p.pays }}, {{ p.indice }}, coté en {{ p.devise }}{% if p.id not in collectees %}
+              <em>(pas encore collectée)</em>{% endif %}.
+              {% if p.note %}{{ p.note }}{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </details>
   {% endfor %}
 
   <h3>Ce que nous ne couvrons pas, et pourquoi</h3>

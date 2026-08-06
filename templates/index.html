@@ -73,14 +73,21 @@
     {% endif %}
   </div>
 
-  {% if place and toutes_places[place].note %}
+  {% if place %}
     <div class="encart encart-info">
-      <p><strong>{{ toutes_places[place].nom }}.</strong> {{ toutes_places[place].note }}</p>
+      <p>
+        <strong>{{ toutes_places[place].drapeau }} {{ toutes_places[place].nom }}</strong> —
+        {{ toutes_places[place].pays }}, {{ toutes_places[place].indice }},
+        coté en {{ toutes_places[place].devise }}.
+        {% if toutes_places[place].note %}{{ toutes_places[place].note }}{% endif %}
+        <a href="/place/{{ place }}?standard={{ standard.id }}">Voir la fiche complète de la place →</a>
+      </p>
     </div>
   {% endif %}
 
+  {#- Pas de champ caché `standard` ici : la liste déroulante plus bas porte
+      déjà ce nom, et deux champs homonymes enverraient deux valeurs. -#}
   <form class="outils" method="get" action="/">
-    <input type="hidden" name="standard" value="{{ standard.id }}">
     {% if filtre %}<input type="hidden" name="verdict" value="{{ filtre }}">{% endif %}
     {% if region %}<input type="hidden" name="region" value="{{ region }}">{% endif %}
     {% if place %}<input type="hidden" name="place" value="{{ place }}">{% endif %}
@@ -95,7 +102,7 @@
     <select name="secteur" class="selecteur" onchange="this.form.submit()">
       <option value="">Tous les secteurs</option>
       {% for s in secteurs %}
-        <option value="{{ s }}" {% if s == secteur %}selected{% endif %}>{{ s }}</option>
+        <option value="{{ s }}" {% if s == secteur %}selected{% endif %}>{{ secteur_fr(s) }}</option>
       {% endfor %}
     </select>
 
@@ -105,19 +112,23 @@
       {% endfor %}
     </select>
 
+    {#- Six standards ne tiennent pas en pastilles : au-delà de trois ou
+        quatre, une liste déroulante se lit mieux qu'une rangée qui déborde. -#}
+    <select name="standard" class="selecteur" onchange="this.form.submit()">
+      {% for sid, std in standards.items() %}
+        <option value="{{ sid }}" {% if sid == standard.id %}selected{% endif %}>Standard : {{ std.label }}</option>
+      {% endfor %}
+    </select>
+
     <noscript><button class="bouton" type="submit">Filtrer</button></noscript>
   </form>
 
-  <div class="outils">
-    <div class="segments">
-      {% for sid, std in standards.items() %}
-        <a href="{{ lien(std=sid) }}" class="{% if sid == standard.id %}on{% endif %}">{{ std.label }}</a>
-      {% endfor %}
-    </div>
-    {% if total_filtre != total %}
-      <span class="compte-filtre num">{{ total_filtre }} valeur{{ 's' if total_filtre > 1 }} trouvée{{ 's' if total_filtre > 1 }}</span>
-    {% endif %}
-  </div>
+  {% if total_filtre != total %}
+    <p class="compte-filtre" style="margin:-4px 0 14px">
+      {{ total_filtre }} valeur{{ 's' if total_filtre > 1 }} trouvée{{ 's' if total_filtre > 1 }}
+      sur {{ total }} dans ce périmètre.
+    </p>
+  {% endif %}
 
   <div class="cadre">
     {% if evaluees %}
@@ -152,7 +163,7 @@
                   </span>
                 {% else %}<span class="secteur">—</span>{% endif %}
               </td>
-              <td class="secteur">{{ s.industry or s.sector or '—' }}</td>
+              <td class="secteur">{{ activite(s) or '—' }}</td>
               <td><span class="verdict v-{{ r.verdict }}">{{ engine.VERDICT_LABELS[r.verdict] }}</span></td>
               <td class="a-droite">{{ (dette.valeur if dette else none) | pourcent }}</td>
               <td class="a-droite">{{ s | rendement }}</td>

@@ -124,8 +124,14 @@
 
 * { box-sizing: border-box; }
 
+/* Colonne pleine hauteur : sans cela, une page courte — la Zakat sans
+   portefeuille, une recherche sans résultat — laisse le pied de page au
+   milieu de l'écran avec une grande zone vide en dessous. */
 body {
   margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: var(--fond);
   color: var(--texte);
   /* `ui-sans-serif` n'est pas résolu partout et retombe alors sur une
@@ -191,8 +197,16 @@ a { color: inherit; }
 
 /* --- Structure -------------------------------------------------------- */
 
-.page { max-width: var(--largeur); margin: 0 auto; padding: 26px 22px 72px; }
+.page {
+  max-width: var(--largeur); margin: 0 auto; padding: 26px 22px 72px;
+  width: 100%; flex: 1 0 auto;
+}
 .page-etroite { max-width: 900px; }
+
+/* Les pages de texte se lisent sur 70 caractères : sans centrage, elles
+   se collent au bord gauche d'un écran large et laissent un vide de
+   plusieurs centaines de pixels à droite. */
+.prose { margin-inline: auto; }
 
 .titre-page {
   font-size: clamp(29px, 5vw, 42px); font-weight: 720;
@@ -675,6 +689,169 @@ td.depasse { color: var(--rouge); }
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+
+/* --- Recherche globale ------------------------------------------------- */
+/* Une seule entrée pour tout atteindre — une valeur, une place, un secteur,
+   une page. Le lecteur qui cherche « Aramco » ou « Kuala Lumpur » ne devrait
+   pas avoir à savoir dans quelle rubrique cela se range. */
+
+.recherche-globale { position: relative; flex: 1 1 300px; max-width: 420px; }
+
+.rg-champ {
+  width: 100%; padding: 8px 13px 8px 36px;
+  background: rgba(255, 255, 255, .09); color: var(--entete-texte);
+  border: 1px solid rgba(255, 255, 255, .13); border-radius: var(--rayon-pill);
+  font: inherit; font-size: 13.5px;
+}
+.rg-champ::placeholder { color: var(--entete-doux); }
+.rg-champ:focus {
+  outline: none; background: rgba(255, 255, 255, .15);
+  border-color: var(--jade);
+}
+.recherche-globale > svg {
+  position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+  width: 15px; height: 15px; color: var(--entete-doux); pointer-events: none;
+}
+.rg-raccourci {
+  position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+  font-size: 11px; color: var(--entete-doux); pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, .16); border-radius: 5px;
+  padding: 1px 5px;
+}
+.rg-champ:focus ~ .rg-raccourci { display: none; }
+
+.rg-resultats {
+  position: absolute; top: calc(100% + 8px); left: 0; right: 0; z-index: 60;
+  background: var(--surface); border: 1px solid var(--bord);
+  border-radius: var(--rayon); box-shadow: var(--ombre-forte);
+  max-height: 420px; overflow-y: auto; padding: 5px;
+}
+.rg-resultats[hidden] { display: none; }
+
+.rg-item {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 11px; border-radius: var(--rayon-s);
+  text-decoration: none; color: var(--texte);
+}
+.rg-item:hover, .rg-item.actif { background: var(--surface-3); }
+.rg-corps { flex: 1; min-width: 0; }
+.rg-nom { font-size: 14px; font-weight: 560; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rg-detail { font-size: 12px; color: var(--texte-faible); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rg-type {
+  font-size: 10.5px; font-weight: 680; letter-spacing: .05em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: var(--rayon-pill); flex-shrink: 0;
+}
+.t-valeur { background: var(--vert-fond); color: var(--vert); }
+.t-place { background: var(--europe-fond); color: var(--europe); }
+.t-secteur { background: var(--asie-fond); color: var(--asie); }
+.t-page { background: var(--surface-3); color: var(--texte-doux); }
+.rg-vide { padding: 20px; text-align: center; color: var(--texte-faible); font-size: 13.5px; }
+
+
+/* --- Actualités illustrées --------------------------------------------- */
+
+.fil-une {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px; margin-bottom: 16px;
+}
+
+.actu-image {
+  display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover;
+  background: var(--surface-3); border-radius: var(--rayon-s);
+  margin-bottom: 2px;
+}
+.actu-une .actu-image { aspect-ratio: 16 / 8.5; }
+.actu-une .actu-titre { font-size: 17.5px; }
+
+.actu-source {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: var(--rayon-pill);
+  background: var(--surface-3); font-size: 11.5px; font-weight: 620;
+  color: var(--texte-doux);
+}
+.r-marches .actu-source { background: var(--europe-fond); color: var(--europe); }
+.r-afrique .actu-source { background: var(--asie-fond); color: var(--asie); }
+.r-monde-musulman .actu-source { background: var(--musulman-fond); color: var(--musulman); }
+
+
+/* --- Fiche de place ---------------------------------------------------- */
+
+.place-tete {
+  display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start;
+  justify-content: space-between;
+  background: var(--surface); border: 1px solid var(--bord);
+  border-radius: 18px; padding: 26px 28px; box-shadow: var(--ombre);
+  margin-bottom: 18px;
+}
+.place-drapeau { font-size: 46px; line-height: 1; }
+.place-titre { font-size: clamp(26px, 4vw, 34px); font-weight: 720; letter-spacing: -0.033em; margin: 0; }
+.place-sous { color: var(--texte-doux); font-size: 15px; margin: 6px 0 0; }
+
+.barre-standards { display: grid; gap: 2px; }
+.bs-ligne {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 18px; background: var(--surface); border: 1px solid var(--bord);
+}
+.bs-ligne:first-child { border-radius: var(--rayon) var(--rayon) 0 0; }
+.bs-ligne:last-child { border-radius: 0 0 var(--rayon) var(--rayon); }
+.bs-ligne + .bs-ligne { border-top: 0; }
+.bs-nom { flex: 0 0 130px; font-size: 13.5px; font-weight: 560; }
+.bs-piste { flex: 1; height: 9px; background: var(--surface-3); border-radius: 5px; overflow: hidden; }
+.bs-part { height: 100%; background: linear-gradient(90deg, var(--vert), var(--jade)); border-radius: 5px; }
+.bs-val { flex: 0 0 78px; text-align: right; font-size: 13.5px; font-weight: 660; font-variant-numeric: tabular-nums; }
+
+
+/* --- Listes repliables -------------------------------------------------- */
+/* Tout déverser d'un coup n'est pas une liste, c'est un mur. Les longues
+   énumérations se replient, et le compte reste visible sur l'en-tête. */
+
+.repli {
+  background: var(--surface); border: 1px solid var(--bord);
+  border-radius: var(--rayon); box-shadow: var(--ombre); overflow: hidden;
+  margin-bottom: 12px;
+}
+.repli + .repli { margin-top: -2px; }
+.repli > summary {
+  display: flex; align-items: center; gap: 11px;
+  padding: 15px 20px; cursor: pointer; list-style: none;
+  font-size: 15px; font-weight: 620; user-select: none;
+}
+.repli > summary::-webkit-details-marker { display: none; }
+.repli > summary::after {
+  content: "›"; margin-left: auto; font-size: 20px; color: var(--texte-faible);
+  transform: rotate(90deg); transition: transform .16s;
+}
+.repli[open] > summary::after { transform: rotate(270deg); }
+.repli > summary:hover { background: var(--surface-2); }
+.repli-compte {
+  font-size: 12px; font-weight: 620; color: var(--texte-doux);
+  background: var(--surface-3); padding: 2px 9px; border-radius: var(--rayon-pill);
+}
+.repli-corps { border-top: 1px solid var(--bord); }
+.repli-corps > .defilement > table { min-width: 0; }
+
+
+/* --- Sélecteur de période du graphique ---------------------------------- */
+
+.periodes { display: flex; gap: 3px; padding: 3px; background: var(--surface-3); border-radius: var(--rayon-pill); }
+.periodes button {
+  padding: 5px 13px; border: 0; border-radius: var(--rayon-pill);
+  background: none; color: var(--texte-doux); cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 600;
+}
+.periodes button:hover { color: var(--texte); }
+.periodes button.on { background: var(--surface); color: var(--texte); box-shadow: var(--ombre); }
+
+.graphique-tete {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  justify-content: space-between; margin-bottom: 12px;
+}
+.curseur-valeur {
+  font-size: 13px; color: var(--texte-doux); font-variant-numeric: tabular-nums;
+  min-height: 20px;
+}
+.curseur-valeur strong { color: var(--texte); font-weight: 660; }
 
 
 /* --- Contrôles -------------------------------------------------------- */

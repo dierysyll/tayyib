@@ -20,6 +20,18 @@
       </svg>
       <span class="marque-nom">Tayyib<sup>halal</sup></span>
     </a>
+
+    <div class="recherche-globale">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5" stroke-linecap="round"/>
+      </svg>
+      <input class="rg-champ" id="rg" type="search" autocomplete="off" role="combobox"
+             aria-expanded="false" aria-controls="rg-resultats"
+             placeholder="Rechercher une valeur, une place, un secteur…">
+      <kbd class="rg-raccourci">/</kbd>
+      <div class="rg-resultats" id="rg-resultats" role="listbox" hidden></div>
+    </div>
+
     <nav class="nav">
       <a href="{{ url_for('accueil') }}" class="{% if request.endpoint == 'accueil' %}on{% endif %}">Screener</a>
       <a href="{{ url_for('analyses') }}" class="{% if request.endpoint == 'analyses' %}on{% endif %}">Analyses</a>
@@ -45,14 +57,113 @@
       qualifié.
     </p>
     <p class="pied-liens">
-      <span>Données&nbsp;: Yahoo Finance</span>
+      <span>Données&nbsp;: Yahoo Finance · presse francophone</span>
       <a href="{{ url_for('methodologie') }}">Méthodologie et limites</a>
       <a href="{{ url_for('methodologie') }}#couverture">Places couvertes</a>
       <a href="{{ url_for('purification') }}">Purification</a>
       <a href="{{ url_for('zakat') }}">Zakat</a>
+      {% for code, l in langues.items() %}
+        {% if code != lang %}
+          <a href="?lang={{ code }}">{{ l.drapeau }} {{ l.nom }}</a>
+        {% endif %}
+      {% endfor %}
     </p>
   </div>
 </footer>
+
+<script>
+// Recherche globale. L'index entier est chargé une fois puis filtré dans le
+// navigateur : chercher ne doit pas coûter un aller-retour réseau par frappe.
+(function () {
+  var champ = document.getElementById('rg'),
+      boite = document.getElementById('rg-resultats'),
+      entrees = null, resultats = [], actif = -1;
+
+  var TYPES = {valeur: 'Valeur', place: 'Place', secteur: 'Secteur', page: 'Page'};
+
+  function charge() {
+    if (entrees) return Promise.resolve(entrees);
+    return fetch('/api/recherche.json')
+      .then(function (r) { return r.json(); })
+      .then(function (d) { entrees = d.entrees; return entrees; })
+      .catch(function () { entrees = []; return entrees; });
+  }
+
+  function cherche(terme) {
+    terme = terme.trim().toLowerCase();
+    if (!terme) return [];
+    // Un début de mot vaut mieux qu'une occurrence au milieu : « ora »
+    // doit proposer Orange avant Sonatel. À rang égal, la plus grosse
+    // capitalisation passe devant.
+    var debut = [], milieu = [];
+    for (var i = 0; i < entrees.length && debut.length + milieu.length < 400; i++) {
+      var pos = entrees[i].cle.indexOf(terme);
+      if (pos === 0 || (pos > 0 && entrees[i].cle[pos - 1] === ' ')) debut.push(entrees[i]);
+      else if (pos > 0) milieu.push(entrees[i]);
+    }
+    var tri = function (a, b) { return b.poids - a.poids; };
+    return debut.sort(tri).concat(milieu.sort(tri)).slice(0, 12);
+  }
+
+  function rend() {
+    if (!resultats.length) {
+      boite.innerHTML = champ.value.trim()
+        ? '<p class="rg-vide">Aucun résultat pour « ' + champ.value.trim() + ' »</p>' : '';
+      boite.hidden = !champ.value.trim();
+      champ.setAttribute('aria-expanded', String(!boite.hidden));
+      return;
+    }
+    boite.innerHTML = resultats.map(function (e, i) {
+      return '<a class="rg-item' + (i === actif ? ' actif' : '') + '" role="option" href="' + e.url + '">' +
+        '<span class="rg-corps"><span class="rg-nom"></span>' +
+        '<span class="rg-detail"></span></span>' +
+        '<span class="rg-type t-' + e.type + '">' + TYPES[e.type] + '</span></a>';
+    }).join('');
+    // Les libellés viennent de la source : on les pose en texte, jamais en HTML.
+    boite.querySelectorAll('.rg-item').forEach(function (el, i) {
+      el.querySelector('.rg-nom').textContent = resultats[i].libelle;
+      el.querySelector('.rg-detail').textContent = resultats[i].detail || '';
+    });
+    boite.hidden = false;
+    champ.setAttribute('aria-expanded', 'true');
+  }
+
+  champ.addEventListener('input', function () {
+    charge().then(function () {
+      resultats = cherche(champ.value);
+      actif = resultats.length ? 0 : -1;
+      rend();
+    });
+  });
+
+  champ.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!resultats.length) return;
+      actif = (actif + (e.key === 'ArrowDown' ? 1 : -1) + resultats.length) % resultats.length;
+      rend();
+    } else if (e.key === 'Enter' && actif >= 0 && resultats[actif]) {
+      e.preventDefault();
+      window.location.href = resultats[actif].url;
+    } else if (e.key === 'Escape') {
+      champ.value = ''; resultats = []; rend(); champ.blur();
+    }
+  });
+
+  champ.addEventListener('focus', charge);
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.recherche-globale')) { boite.hidden = true; }
+  });
+
+  // « / » met le curseur dans la recherche, sauf si l'on est déjà en train
+  // de saisir ailleurs.
+  document.addEventListener('keydown', function (e) {
+    var dans = document.activeElement;
+    var saisie = dans && (dans.tagName === 'INPUT' || dans.tagName === 'TEXTAREA' || dans.tagName === 'SELECT');
+    if (e.key === '/' && !saisie) { e.preventDefault(); champ.focus(); }
+  });
+})();
+</script>
 
 </body>
 </html>

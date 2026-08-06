@@ -78,6 +78,61 @@ STANDARDS = {
             "puisqu'il ne dépend pas du cours de Bourse."
         ),
     },
+    "sp": {
+        "id": "sp",
+        "label": "S&P Shariah",
+        "full": "S&P Dow Jones Shariah Indices",
+        "denominator": "market_cap",
+        "denominator_label": "capitalisation boursière",
+        "ratios": {
+            "debt": 0.33,
+            "liquidity": 0.33,
+            "receivables": 0.49,
+        },
+        "uses_receivables": True,
+        "note": (
+            "S&P retient la capitalisation moyenne sur 36 mois, là où nous "
+            "utilisons celle du jour. Sa particularité est le seuil de "
+            "créances, nettement plus permissif (49 %) que celui du Dow "
+            "Jones — un même distributeur peut passer ici et échouer là."
+        ),
+    },
+    "ftse": {
+        "id": "ftse",
+        "label": "FTSE Shariah",
+        "full": "FTSE Shariah Global Equity Index Series",
+        "denominator": "total_assets",
+        "denominator_label": "total du bilan",
+        "ratios": {
+            "debt": 1 / 3,
+            "liquidity": 1 / 3,
+            "receivables": 0.50,
+        },
+        "uses_receivables": True,
+        "note": (
+            "FTSE, comme MSCI, rapporte au total du bilan, mais tolère "
+            "jusqu'à 50 % de créances. C'est le plus permissif des standards "
+            "implémentés sur ce poste."
+        ),
+    },
+    "sc-malaisie": {
+        "id": "sc-malaisie",
+        "label": "SC Malaisie",
+        "full": "Securities Commission Malaysia — Shariah Screening",
+        "denominator": "total_assets",
+        "denominator_label": "total du bilan",
+        "ratios": {
+            "debt": 0.33,
+            "liquidity": 0.33,
+        },
+        "uses_receivables": False,
+        "note": (
+            "Le régulateur malaisien n'impose aucun seuil de créances : deux "
+            "ratios seulement, rapportés au total du bilan. C'est le standard "
+            "d'un pays où la finance islamique est la plus institutionnalisée, "
+            "et il est plus simple que ceux des fournisseurs d'indices."
+        ),
+    },
 }
 
 DEFAULT_STANDARD = "aaoifi"

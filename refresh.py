@@ -37,7 +37,7 @@ import sys
 import threading
 import time
 
-from data import cache, fx, universe, yahoo
+from data import cache, fx, presse, universe, yahoo
 
 TRAVAILLEURS = 3      # requêtes simultanées vers Yahoo
 PAUSE = 0.35          # secondes entre deux départs, par travailleur
@@ -117,7 +117,12 @@ def collecte_valeurs(places, force=False):
     if not a_faire:
         return 0, []
 
-    taux = fx.collecte(universe.devises())
+    # Les devises des places screenées, plus celles dans lesquelles un
+    # utilisateur peut détenir des avoirs (voir data/fx.py) : la zakat
+    # porte sur un patrimoine, pas sur un portefeuille d'actions.
+    taux = fx.collecte(
+        universe.devises() + [d["code"] for d in fx.DEVISES_USUELLES]
+    )
     print(f"Taux de change : {len(taux)} devises ({', '.join(sorted(taux))})\n")
 
     # Deux registres d'échec, parce qu'ils appellent deux actions
@@ -217,7 +222,14 @@ def collecte_actus():
             uniques.append(article)
 
     cache.save_actus(uniques)
-    print(f"\n{len(uniques)} articles distincts écrits")
+    print(f"\n{len(uniques)} dépêches par valeur écrites")
+
+    # Le fil francophone, qui ne dépend ni de l'univers ni de Yahoo.
+    articles = presse.collecte()
+    cache.save_presse(articles)
+    illustres = sum(1 for a in articles if a.get("image"))
+    print(f"{len(articles)} articles de presse francophone ({illustres} illustrés)")
+
     return uniques
 
 
@@ -234,7 +246,7 @@ def main():
     args = parseur.parse_args()
 
     if args.index:
-        taux = fx.collecte(universe.devises())
+        taux = fx.collecte(universe.devises() + [d["code"] for d in fx.DEVISES_USUELLES])
         print(f"{_ecrire_index(taux, avec_metaux=True)} valeurs réécrites dans l'index")
         return 0
 

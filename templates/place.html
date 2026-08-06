@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block titre %}{{ place.nom }}{% endblock %}
+{% block description %}Le screening halal de la place de {{ place.nom }} ({{ place.pays }}) : {{ total }} valeurs, taux de conformité par standard et par secteur.{% endblock %}
+
+{% block contenu %}
+<main class="page">
+
+  <a class="retour" href="/?standard={{ standard.id }}&amp;region={{ place.region }}">← {{ region.nom }}</a>
+
+  <div class="place-tete">
+    <div style="display:flex;gap:18px;align-items:flex-start">
+      <span class="place-drapeau">{{ place.drapeau }}</span>
+      <div>
+        <h1 class="place-titre">{{ place.nom }}</h1>
+        <p class="place-sous">
+          {{ place.pays }} · {{ place.indice }} · coté en {{ place.devise }}
+        </p>
+      </div>
+    </div>
+    <a class="bouton" href="/?standard={{ standard.id }}&amp;region={{ place.region }}&amp;place={{ place.id }}">
+      Filtrer le screener sur cette place
+    </a>
+  </div>
+
+  {% if place.note %}
+    <div class="encart encart-info">
+      <p><strong>À savoir sur cette place.</strong> {{ place.note }}</p>
+    </div>
+  {% endif %}
+
+  <div class="compteurs">
+    <div class="compteur c-tous">
+      <div class="compteur-nb">{{ total }}</div>
+      <div class="compteur-lb">Valeurs collectées</div>
+      {% if declarees != total %}
+        <div class="compteur-part">{{ declarees }} déclarées dans l'univers</div>
+      {% endif %}
+    </div>
+    {% for v, libelle in [('conforme', 'Conformes'), ('a_verifier', 'À vérifier'), ('non_conforme', 'Non conformes')] %}
+      <a class="compteur c-{{ v }}"
+         href="/?standard={{ standard.id }}&amp;region={{ place.region }}&amp;place={{ place.id }}&amp;verdict={{ v }}">
+        <div class="compteur-nb">{{ compteurs[v] }}</div>
+        <div class="compteur-lb">{{ libelle }}</div>
+        {% if total %}<div class="compteur-part">{{ (compteurs[v] / total * 100) | round | int }} % de la place</div>{% endif %}
+      </a>
+    {% endfor %}
+  </div>
+
+  <h2 class="section">Le taux de conformité selon chaque standard</h2>
+  <div class="barre-standards">
+    {% for s in par_standard %}
+      <div class="bs-ligne">
+        <span class="bs-nom">{{ s.standard.label }}</span>
+        <span class="bs-piste">
+          <span class="bs-part" style="width:{{ (s.conformes / total * 100) if total else 0 }}%"></span>
+        </span>
+        <span class="bs-val">{{ s.conformes }} / {{ total }}</span>
+      </div>
+    {% endfor %}
+  </div>
+  <p class="graphique-note">
+    L'écart entre ces barres ne dit rien de la piété des entreprises : il dit
+    seulement que les standards ne rapportent pas les mêmes montants au même
+    dénominateur. Sur une place riche en valeurs très valorisées, ceux qui
+    divisent par la capitalisation boursière paraissent plus permissifs ; sur
+    une place industrielle, c'est l'inverse.
+  </p>
+
+  <h2 class="section">Les plus grandes valeurs de la place</h2>
+  <div class="cadre">
+    <div class="defilement">
+      <table>
+        <thead>
+          <tr>
+            <th>Valeur</th>
+            <th>Secteur</th>
+            <th>Verdict {{ standard.label }}</th>
+            <th class="a-droite">Rendement</th>
+            <th class="a-droite">Capitalisation</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in vedettes %}
+            {% set s = e.societe %}
+            <tr>
+              <td>
+                <a class="nom-valeur" href="/valeur/{{ s.ticker }}?standard={{ standard.id }}">{{ s.nom }}</a>
+                <div class="ticker">{{ s.ticker }}</div>
+              </td>
+              <td class="secteur">{{ activite(s) or '—' }}</td>
+              <td><span class="verdict v-{{ e.resultat.verdict }}">{{ engine.VERDICT_LABELS[e.resultat.verdict] }}</span></td>
+              <td class="a-droite">{{ s | rendement }}</td>
+              <td class="a-droite">{{ s.market_cap_eur | euros }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if secteurs %}
+    <h2 class="section">Répartition sectorielle</h2>
+    <details class="repli">
+      <summary>
+        Les {{ secteurs | length }} secteurs représentés
+        <span class="repli-compte">{{ total }} valeurs</span>
+      </summary>
+      <div class="repli-corps">
+        <div class="defilement">
+          <table>
+            <thead>
+              <tr>
+                <th>Secteur</th>
+                <th class="a-droite">Valeurs</th>
+                <th class="a-droite">Conformes</th>
+                <th class="a-droite">Taux</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in secteurs %}
+                <tr>
+                  <td>{{ s.nom }}</td>
+                  <td class="a-droite">{{ s.total }}</td>
+                  <td class="a-droite" style="color:var(--vert);font-weight:600">{{ s.conformes }}</td>
+                  <td class="a-droite">{{ (s.conformes / s.total * 100) | round | int }} %</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+  {% endif %}
+
+  {% if fetched_at %}
+    <p class="pied-liens" style="margin-top:22px">Données collectées le {{ fetched_at | date_fr }}.</p>
+  {% endif %}
+
+</main>
+{% endblock %}

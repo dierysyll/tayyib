@@ -9,14 +9,46 @@ screening/ (les règles et les analyses), data/ (la collecte) et charts.py
 """
 
 import os
+from urllib.parse import quote
 
 from flask import Flask, abort, jsonify, render_template, request
 
 import charts
-from data import cache, fx, universe
-from screening import analyses, engine, standards
+from data import cache, fx, presse, universe, yahoo
+from screening import analyses, engine, standards, vocabulaire
 
 app = Flask(__name__)
+
+
+def _langue():
+    """La langue d'affichage : celle demandée dans l'URL, sinon celle
+    retenue au passage précédent, sinon le français."""
+    demandee = request.args.get("lang")
+    if demandee in vocabulaire.LANGUES:
+        return demandee
+    return vocabulaire.normalise(request.cookies.get("lang", ""))
+
+
+@app.context_processor
+def _injecte_langue():
+    langue = _langue()
+    return {
+        "lang": langue,
+        "langues": vocabulaire.LANGUES,
+        "secteur_fr": lambda nom: vocabulaire.secteur(nom, langue),
+        "activite": lambda societe: vocabulaire.activite(societe, langue),
+    }
+
+
+@app.after_request
+def _memorise_langue(reponse):
+    """Mémorise la langue choisie explicitement, pour que la navigation
+    suivante la conserve sans réécrire toutes les URL."""
+    demandee = request.args.get("lang", "")
+    if demandee in vocabulaire.LANGUES and request.cookies.get("lang") != demandee:
+        reponse.set_cookie("lang", demandee, max_age=60 * 60 * 24 * 365,
+                           samesite="Lax")
+    return reponse
 
 # Ordre d'affichage : ce qu'on peut acheter d'abord, ce qui est exclu en
 # dernier. Un screener sert à trouver, pas à parcourir des rejets.
@@ -119,9 +151,13 @@ def accueil():
         for v in ORDRE_VERDICT
     }
 
-    secteurs = sorted({
-        e["societe"]["sector"] for e in portee if e["societe"].get("sector")
-    })
+    # Triés sur le libellé affiché, pas sur l'intitulé Yahoo : en français,
+    # « Énergie » ne se range pas où se rangeait « Energy ».
+    langue = _langue()
+    secteurs = sorted(
+        {e["societe"]["sector"] for e in portee if e["societe"].get("sector")},
+        key=lambda s: vocabulaire.secteur(s, langue).lower(),
+    )
 
     return render_template(
         "index.html",
@@ -258,38 +294,226 @@ def analyses_page():
 
 @app.route("/actualites")
 def actualites():
+    """Deux fils, volontairement distincts.
+
+    Le fil de presse francophone (marchés, Afrique, monde musulman) est
+    celui qui parle au lecteur ; les dépêches Yahoo, anglophones, ont pour
+    seul mérite d'être rattachées à une valeur précise et à son verdict.
+    Les mélanger produirait une bouillie où l'on ne saurait plus ce qu'on
+    lit — on les sépare donc en rubriques.
+    """
     standard_id = _standard_demande()
-    articles, collecte = cache.actus()
-    valeurs, _, _ = cache.index()
+    rubrique = request.args.get("rubrique", "marches")
 
-    # On rattache à chaque article le verdict de la valeur concernée : lire
-    # une actualité sur une société non conforme sans le savoir n'aurait
-    # aucun intérêt ici.
-    index_valeurs = {v["ticker"]: v for v in valeurs}
-    enrichis = []
-    for article in articles:
-        societe = index_valeurs.get(article.get("ticker"))
-        enrichis.append({
-            **article,
-            "societe": societe,
-            "verdict": engine.evaluate(societe, standard_id)["verdict"] if societe else None,
-            "place": universe.PLACES.get(societe.get("place")) if societe else None,
-        })
+    articles_presse, collecte_presse = cache.presse()
+    depeches, collecte_yahoo = cache.actus()
 
-    filtre = request.args.get("verdict")
-    if filtre in ORDRE_VERDICT:
-        enrichis = [a for a in enrichis if a["verdict"] == filtre]
+    if rubrique == "valeurs":
+        valeurs, _, _ = cache.index()
+        index_valeurs = {v["ticker"]: v for v in valeurs}
+        articles = []
+        for depeche in depeches:
+            societe = index_valeurs.get(depeche.get("ticker"))
+            if not societe:
+                continue
+            articles.append({
+                **depeche,
+                "societe": societe,
+                "verdict": engine.evaluate(societe, standard_id)["verdict"],
+                "place": universe.PLACES.get(societe.get("place")),
+            })
+
+        filtre = request.args.get("verdict")
+        if filtre in ORDRE_VERDICT:
+            articles = [a for a in articles if a["verdict"] == filtre]
+        collecte = collecte_yahoo
+    else:
+        if rubrique not in presse.RUBRIQUES:
+            rubrique = "marches"
+        articles = [a for a in articles_presse if a.get("rubrique") == rubrique]
+        filtre = None
+        collecte = collecte_presse
+
+    comptes = {
+        rid: sum(1 for a in articles_presse if a.get("rubrique") == rid)
+        for rid in presse.RUBRIQUES
+    }
+    comptes["valeurs"] = len(depeches)
 
     return render_template(
         "actualites.html",
-        articles=enrichis[:60],
-        total=len(articles),
+        articles=articles[:48],
+        rubrique=rubrique,
+        rubriques=presse.RUBRIQUES,
+        comptes=comptes,
         filtre=filtre,
         collecte=collecte,
         standard=standards.get(standard_id),
         standards=standards.STANDARDS,
         engine=engine,
     )
+
+
+@app.route("/place/<place_id>")
+def place(place_id):
+    """La fiche d'une place de marché.
+
+    Une pastille qui ne fait que filtrer laisse le lecteur sans réponse à
+    la question qu'il se pose vraiment en cliquant : qu'est-ce que cette
+    place, et pourquoi y trouve-t-on si peu — ou si beaucoup — de valeurs
+    conformes ?
+    """
+    infos = universe.PLACES.get(place_id)
+    if infos is None:
+        abort(404)
+
+    standard_id = _standard_demande()
+    evaluees, fetched_at, _ = _univers(standard_id)
+    sur_place = [e for e in evaluees if e["societe"].get("place") == place_id]
+
+    compteurs = {
+        v: sum(1 for e in sur_place if e["resultat"]["verdict"] == v)
+        for v in ORDRE_VERDICT
+    }
+
+    # Le même exercice selon les six standards : c'est sur une place entière
+    # que l'écart entre conventions devient parlant.
+    par_standard = [
+        {
+            "standard": std,
+            "conformes": sum(
+                1 for e in sur_place
+                if engine.evaluate(e["societe"], sid)["verdict"] == engine.CONFORME
+            ),
+        }
+        for sid, std in standards.STANDARDS.items()
+    ]
+
+    langue = _langue()
+    secteurs = {}
+    for e in sur_place:
+        nom = vocabulaire.secteur(e["societe"].get("sector"), langue)
+        if not nom:
+            continue
+        case = secteurs.setdefault(nom, {"nom": nom, "total": 0, "conformes": 0})
+        case["total"] += 1
+        if e["resultat"]["verdict"] == engine.CONFORME:
+            case["conformes"] += 1
+
+    return render_template(
+        "place.html",
+        place=dict(infos, id=place_id),
+        region=universe.REGIONS[infos["region"]],
+        compteurs=compteurs,
+        total=len(sur_place),
+        declarees=len(infos["valeurs"]),
+        par_standard=par_standard,
+        secteurs=sorted(secteurs.values(), key=lambda s: -s["total"]),
+        vedettes=_trier(sur_place, "capitalisation")[:12],
+        standard=standards.get(standard_id),
+        standards=standards.STANDARDS,
+        fetched_at=fetched_at,
+        engine=engine,
+    )
+
+
+@app.route("/api/recherche.json")
+def api_recherche():
+    """L'index de la recherche globale.
+
+    Un seul appel, mis en cache par le navigateur : valeurs, places,
+    secteurs et pages dans une même liste, que le client filtre lui-même.
+    Chercher ne doit pas coûter un aller-retour réseau par frappe.
+    """
+    langue = _langue()
+    valeurs, _, _ = cache.index()
+    standard_id = _standard_demande()
+
+    entrees = [
+        {
+            "type": "valeur",
+            "libelle": v["nom"],
+            "detail": f'{v["ticker"]} · {vocabulaire.activite(v, langue) or ""}'.strip(" ·"),
+            "url": f'/valeur/{v["ticker"]}?standard={standard_id}',
+            "cle": f'{v["nom"]} {v["ticker"]}'.lower(),
+            "poids": v.get("market_cap_eur") or 0,
+        }
+        for v in valeurs
+    ]
+
+    entrees += [
+        {
+            "type": "place",
+            "libelle": f'{p["drapeau"]} {p["nom"]}',
+            "detail": f'{p["pays"]} · {p["indice"]}',
+            "url": f'/place/{pid}?standard={standard_id}',
+            "cle": f'{p["nom"]} {p["pays"]} {p["indice"]}'.lower(),
+            "poids": 1e12,
+        }
+        for pid, p in universe.PLACES.items()
+    ]
+
+    secteurs = sorted({v["sector"] for v in valeurs if v.get("sector")})
+    entrees += [
+        {
+            "type": "secteur",
+            "libelle": vocabulaire.secteur(s, langue),
+            "detail": "Secteur d'activité",
+            "url": f"/?standard={standard_id}&secteur={quote(s)}",
+            "cle": f"{vocabulaire.secteur(s, langue)} {s}".lower(),
+            "poids": 5e11,
+        }
+        for s in secteurs
+    ]
+
+    entrees += [
+        {"type": "page", "libelle": libelle, "detail": detail, "url": url,
+         "cle": f"{libelle} {detail}".lower(), "poids": 9e11}
+        for libelle, detail, url in [
+            ("Screener", "Filtrer l'univers", "/"),
+            ("Analyses", "Basculements, palmarès, désaccords", "/analyses"),
+            ("Actualités", "Presse francophone et monde musulman", "/actualites"),
+            ("Portefeuille", "Vos lignes, en local", "/portefeuille"),
+            ("Purification", "Montant à purifier sur les dividendes", "/purification"),
+            ("Zakat", "Assiette, nissab, 2,5 %", "/zakat"),
+            ("Méthodologie", "Comment les verdicts sont produits", "/methodologie"),
+        ]
+    ]
+
+    return jsonify({"entrees": entrees})
+
+
+@app.route("/api/cours/<ticker>.json")
+def api_cours(ticker):
+    """L'historique de cours d'une valeur, en pas journalier.
+
+    La collecte de masse stocke un point par semaine sur six ans : assez
+    pour situer les arrêtés comptables, beaucoup trop grossier pour lire un
+    mois. Le pas journalier est donc récupéré ici, à la demande et pour une
+    seule valeur, puis conservé sur disque — un visiteur le paie une fois,
+    les suivants jamais.
+    """
+    valeurs, _, _ = cache.index()
+    connu = next(
+        (v for v in valeurs if (v.get("ticker") or "").lower() == ticker.lower()),
+        None,
+    )
+    if connu is None:
+        abort(404)
+
+    points = cache.cours_journalier(connu["ticker"])
+    if points is None:
+        points = yahoo.fetch_cours_journalier(connu["ticker"])
+        if points:
+            cache.save_cours_journalier(connu["ticker"], points)
+
+    detail = cache.detail(connu["ticker"]) or {}
+    return jsonify({
+        "ticker": connu["ticker"],
+        "devise": connu.get("currency"),
+        "journalier": points or [],
+        "hebdomadaire": detail.get("cours") or [],
+    })
 
 
 @app.route("/portefeuille")
@@ -324,12 +548,23 @@ def purification():
 
 @app.route("/zakat")
 def zakat():
-    """La zakat sur un portefeuille d'actions."""
-    _, _, _ = cache.index()
-    metaux = cache.metaux()
+    """La zakat sur un patrimoine.
+
+    Volontairement pas « sur un portefeuille d'actions » : la zakat porte
+    sur ce qu'on possède, et beaucoup de musulmans francophones n'ont pas
+    d'actions du tout. Quelqu'un à Dakar ou à Casablanca compte son épargne
+    en francs CFA ou en dirhams — la page doit savoir les additionner.
+    """
+    _, _, taux = cache.index()
+    # On n'expose que les devises dont on a réellement le taux : proposer
+    # une devise puis afficher « — » à la place du montant serait pire que
+    # de ne pas la proposer.
+    devises = [d for d in fx.DEVISES_USUELLES if d["code"] in taux]
     return render_template(
         "zakat.html",
-        metaux=metaux,
+        metaux=cache.metaux(),
+        devises=devises,
+        taux={d["code"]: taux[d["code"]] for d in devises},
         standard=standards.get(_standard_demande()),
         standards=standards.STANDARDS,
     )

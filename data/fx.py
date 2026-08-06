@@ -38,6 +38,40 @@ SOUS_UNITES = {
 }
 
 
+# Devises dans lesquelles un utilisateur est susceptible de détenir des
+# avoirs, indépendamment des places que nous screenons. La zakat porte sur
+# un patrimoine, pas sur un portefeuille d'actions : quelqu'un à Dakar
+# compte son épargne en francs CFA et n'a peut-être aucune action.
+#
+# Le franc CFA (XOF pour l'UEMOA, XAF pour la CEMAC) est arrimé à l'euro à
+# parité fixe — 655,957 — mais on le demande quand même à la source plutôt
+# que de figer la constante : une parité politique peut être modifiée, et
+# l'a déjà été.
+DEVISES_USUELLES = [
+    {"code": "EUR", "nom": "Euro", "zone": "Europe"},
+    {"code": "XOF", "nom": "Franc CFA (UEMOA)", "zone": "Afrique de l'Ouest"},
+    {"code": "XAF", "nom": "Franc CFA (CEMAC)", "zone": "Afrique centrale"},
+    {"code": "MAD", "nom": "Dirham marocain", "zone": "Maghreb"},
+    {"code": "DZD", "nom": "Dinar algérien", "zone": "Maghreb"},
+    {"code": "TND", "nom": "Dinar tunisien", "zone": "Maghreb"},
+    {"code": "EGP", "nom": "Livre égyptienne", "zone": "Afrique du Nord"},
+    {"code": "NGN", "nom": "Naira nigérian", "zone": "Afrique de l'Ouest"},
+    {"code": "SAR", "nom": "Riyal saoudien", "zone": "Golfe"},
+    {"code": "AED", "nom": "Dirham émirati", "zone": "Golfe"},
+    {"code": "QAR", "nom": "Riyal qatari", "zone": "Golfe"},
+    {"code": "KWD", "nom": "Dinar koweïtien", "zone": "Golfe"},
+    {"code": "TRY", "nom": "Livre turque", "zone": "Turquie"},
+    {"code": "MYR", "nom": "Ringgit malaisien", "zone": "Asie du Sud-Est"},
+    {"code": "IDR", "nom": "Roupie indonésienne", "zone": "Asie du Sud-Est"},
+    {"code": "PKR", "nom": "Roupie pakistanaise", "zone": "Asie du Sud"},
+    {"code": "BDT", "nom": "Taka bangladais", "zone": "Asie du Sud"},
+    {"code": "USD", "nom": "Dollar américain", "zone": "International"},
+    {"code": "GBP", "nom": "Livre sterling", "zone": "International"},
+    {"code": "CHF", "nom": "Franc suisse", "zone": "International"},
+    {"code": "CAD", "nom": "Dollar canadien", "zone": "International"},
+]
+
+
 def _paire(devise):
     """Le symbole Yahoo du taux EUR → devise (ex. EURUSD=X)."""
     return f"EUR{devise}=X"
