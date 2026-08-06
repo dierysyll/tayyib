@@ -60,6 +60,17 @@ ACTUS_VALEURS = 60
 _verrou = threading.Lock()
 
 
+def _devises():
+    """Les devises à collecter.
+
+    Celles des places screenées, plus celles dans lesquelles un utilisateur
+    peut détenir des avoirs : la zakat porte sur un patrimoine, pas sur un
+    portefeuille d'actions, et le convertisseur doit connaître le franc CFA
+    même si aucune place n'y cote.
+    """
+    return universe.devises() + [d["code"] for d in fx.DEVISES_USUELLES]
+
+
 def _collecte_une(ticker):
     """Une société, avec longues retentes en cas de blocage.
 
@@ -117,12 +128,7 @@ def collecte_valeurs(places, force=False):
     if not a_faire:
         return 0, []
 
-    # Les devises des places screenées, plus celles dans lesquelles un
-    # utilisateur peut détenir des avoirs (voir data/fx.py) : la zakat
-    # porte sur un patrimoine, pas sur un portefeuille d'actions.
-    taux = fx.collecte(
-        universe.devises() + [d["code"] for d in fx.DEVISES_USUELLES]
-    )
+    taux = fx.collecte(_devises())
     print(f"Taux de change : {len(taux)} devises ({', '.join(sorted(taux))})\n")
 
     # Deux registres d'échec, parce qu'ils appellent deux actions
@@ -246,7 +252,7 @@ def main():
     args = parseur.parse_args()
 
     if args.index:
-        taux = fx.collecte(universe.devises() + [d["code"] for d in fx.DEVISES_USUELLES])
+        taux = fx.collecte(_devises())
         print(f"{_ecrire_index(taux, avec_metaux=True)} valeurs réécrites dans l'index")
         return 0
 
@@ -257,7 +263,7 @@ def main():
     reussies, bloques, inconnus = collecte_valeurs(
         _places_demandees(args.places), args.force
     )
-    total = _ecrire_index(fx.collecte(universe.devises()), avec_metaux=True)
+    total = _ecrire_index(fx.collecte(_devises()), avec_metaux=True)
 
     duree = time.time() - debut
     print(f"\n{reussies} valeurs collectées en {duree / 60:.1f} min")

@@ -537,6 +537,26 @@ def portefeuille():
     )
 
 
+@app.route("/outils")
+def outils():
+    """Les calculateurs de projection patrimoniale.
+
+    Tout est calculé dans le navigateur : ces outils ne consultent aucune
+    donnée personnelle et n'en transmettent aucune. Les taux de change
+    viennent de la collecte, le reste est de l'arithmétique.
+    """
+    _, _, taux = cache.index()
+    devises = [d for d in fx.DEVISES_USUELLES if d["code"] in taux]
+    return render_template(
+        "outils.html",
+        devises=devises,
+        taux={d["code"]: taux[d["code"]] for d in devises},
+        metaux=cache.metaux(),
+        standard=standards.get(_standard_demande()),
+        standards=standards.STANDARDS,
+    )
+
+
 @app.route("/purification")
 def purification():
     """Le calcul du montant à purifier sur les dividendes perçus."""

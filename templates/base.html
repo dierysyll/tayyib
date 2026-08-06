@@ -37,8 +37,10 @@
       <a href="{{ url_for('analyses') }}" class="{% if request.endpoint == 'analyses' %}on{% endif %}">Analyses</a>
       <a href="{{ url_for('actualites') }}" class="{% if request.endpoint == 'actualites' %}on{% endif %}">Actualités</a>
       <a href="{{ url_for('portefeuille') }}" class="{% if request.endpoint == 'portefeuille' %}on{% endif %}">Portefeuille</a>
-      <a href="{{ url_for('purification') }}" class="{% if request.endpoint == 'purification' %}on{% endif %}">Purification</a>
-      <a href="{{ url_for('zakat') }}" class="{% if request.endpoint == 'zakat' %}on{% endif %}">Zakat</a>
+      {#- Purification, Zakat et les calculateurs se rejoignent sous « Outils » :
+          huit onglets ne se lisent plus, ils se subissent. -#}
+      <a href="{{ url_for('outils') }}"
+         class="{% if request.endpoint in ('outils', 'purification', 'zakat') %}on{% endif %}">Outils</a>
       <a href="{{ url_for('methodologie') }}" class="{% if request.endpoint == 'methodologie' %}on{% endif %}">Méthodologie</a>
     </nav>
   </header>

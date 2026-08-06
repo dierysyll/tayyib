@@ -1,0 +1,441 @@
+{% extends "base.html" %}
+{% from "icones.html" import icone %}
+{% block titre %}Outils{% endblock %}
+{% block description %}Calculateurs pour investisseur musulman : capitalisation des rendements, épargne programmée, objectif patrimonial, rendement réel après inflation, prix de revient, conversion de devises.{% endblock %}
+
+{% block contenu %}
+<main class="page page-etroite">
+
+  <h1 class="titre-page">Outils</h1>
+  <p class="chapeau">
+    Des calculateurs de projection, et rien de plus : ils font de l'arithmétique
+    sur les hypothèses que vous saisissez. Tout est calculé dans votre
+    navigateur — aucune de ces valeurs ne nous est transmise.
+  </p>
+
+  {# --- La nuance qu'il faut poser d'emblée --------------------------- #}
+  <div class="encart">
+    <p><strong>Capitalisation n'est pas intérêt composé.</strong>
+    Le vocabulaire bancaire parle d'« intérêts composés » : un capital prêté qui
+    produit un intérêt, lequel produit à son tour un intérêt. C'est du
+    <em>riba</em>, et cet outil ne le calcule pas.</p>
+    <p>Ce qui est calculé ici est la <strong>capitalisation des rendements</strong> :
+    vous détenez une part d'entreprise, elle dégage un bénéfice, vous en
+    réinvestissez le produit pour détenir une part plus grande. Le mécanisme
+    mathématique est le même — une croissance géométrique — mais sa nature est
+    autre : c'est le fruit d'un capital exposé au risque de l'entreprise, non la
+    rémunération garantie d'un prêt.</p>
+    <p><strong>Un rendement n'est pas garanti.</strong> Ces projections supposent
+    un taux constant, ce qu'aucun marché ne fait. Elles servent à comparer des
+    ordres de grandeur, pas à promettre un résultat.</p>
+  </div>
+
+  {# --- 1. Capitalisation -------------------------------------------- #}
+  <h2 class="section">{{ icone("marche") }} Capitalisation des rendements</h2>
+  <p class="chapeau">
+    Ce que devient un capital placé, avec ou sans versements réguliers, si les
+    bénéfices sont réinvestis.
+  </p>
+
+  <div class="calc">
+    <div class="calc-champs">
+      <div class="champ">
+        <label for="cap-initial">Capital de départ (€)</label>
+        <input type="number" id="cap-initial" min="0" step="100" value="5000">
+      </div>
+      <div class="champ">
+        <label for="cap-mensuel">Versement mensuel (€)</label>
+        <input type="number" id="cap-mensuel" min="0" step="10" value="200">
+      </div>
+      <div class="champ">
+        <label for="cap-taux">Rendement annuel (%)</label>
+        <input type="number" id="cap-taux" step="0.1" value="7">
+        <p class="champ-aide">Hypothèse, pas promesse.</p>
+      </div>
+      <div class="champ">
+        <label for="cap-annees">Durée (années)</label>
+        <input type="number" id="cap-annees" min="1" max="60" step="1" value="20">
+      </div>
+    </div>
+
+    <div class="verdict-geant" style="margin-bottom:0">
+      <div class="vg-case">
+        <div class="vg-lb">Total versé</div>
+        <div class="vg-val" id="cap-verse">—</div>
+        <div class="vg-note" id="cap-note-verse"></div>
+      </div>
+      <div class="vg-case">
+        <div class="vg-lb">Produit de la capitalisation</div>
+        <div class="vg-val" id="cap-gain">—</div>
+        <div class="vg-note">Ce que le réinvestissement a ajouté.</div>
+      </div>
+      <div class="vg-case accent">
+        <div class="vg-lb">Capital au terme</div>
+        <div class="vg-val" id="cap-final">—</div>
+        <div class="vg-note" id="cap-note-final"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cadre graphique" style="margin-top:12px">
+    <div class="graphe-hote" id="cap-graphe"></div>
+    <div class="graphique-legende">
+      <span class="leg leg-verse">Versements cumulés</span>
+      <span class="leg leg-conforme">Capital avec réinvestissement</span>
+    </div>
+    <p class="graphique-note">
+      L'écart entre les deux courbes est le produit de la capitalisation. Il est
+      dérisoire les premières années et devient l'essentiel du capital après
+      quinze ou vingt ans : c'est la durée qui travaille, pas le taux.
+    </p>
+  </div>
+
+  {# --- 2. Objectif --------------------------------------------------- #}
+  <h2 class="section">{{ icone("valeurs") }} Atteindre un objectif</h2>
+  <p class="chapeau">
+    Combien mettre de côté chaque mois pour réunir une somme donnée — un
+    pèlerinage, un apport, les études d'un enfant.
+  </p>
+
+  <div class="calc">
+    <div class="calc-champs">
+      <div class="champ">
+        <label for="obj-cible">Somme visée (€)</label>
+        <input type="number" id="obj-cible" min="0" step="500" value="20000">
+      </div>
+      <div class="champ">
+        <label for="obj-initial">Déjà épargné (€)</label>
+        <input type="number" id="obj-initial" min="0" step="100" value="0">
+      </div>
+      <div class="champ">
+        <label for="obj-taux">Rendement annuel (%)</label>
+        <input type="number" id="obj-taux" step="0.1" value="5">
+      </div>
+      <div class="champ">
+        <label for="obj-annees">Dans combien d'années</label>
+        <input type="number" id="obj-annees" min="1" max="50" step="1" value="5">
+      </div>
+      <div class="calc-sortie">
+        <div class="cs-lb">Versement mensuel nécessaire</div>
+        <div class="cs-val" id="obj-mensuel">—</div>
+      </div>
+    </div>
+    <p class="champ-aide" id="obj-note" style="margin-top:12px"></p>
+  </div>
+
+  {# --- 3. Rendement réel --------------------------------------------- #}
+  <h2 class="section">{{ icone("baisse") }} Rendement réel, après inflation</h2>
+  <p class="chapeau">
+    Un placement à 12 % dans un pays à 15 % d'inflation appauvrit son détenteur.
+    C'est loin d'être théorique : la livre turque, la livre égyptienne et le naira
+    ont connu des inflations à deux chiffres ces dernières années, et le calcul
+    change alors complètement les conclusions.
+  </p>
+
+  <div class="calc">
+    <div class="calc-champs">
+      <div class="champ">
+        <label for="re-nominal">Rendement nominal (%)</label>
+        <input type="number" id="re-nominal" step="0.1" value="8">
+      </div>
+      <div class="champ">
+        <label for="re-inflation">Inflation (%)</label>
+        <input type="number" id="re-inflation" step="0.1" value="3">
+      </div>
+      <div class="calc-sortie" id="re-boite">
+        <div class="cs-lb">Rendement réel</div>
+        <div class="cs-val" id="re-reel">—</div>
+      </div>
+    </div>
+    <p class="champ-aide" style="margin-top:12px">
+      Formule de Fisher — (1 + nominal) / (1 + inflation) − 1 — et non la
+      soustraction simple, qui se trompe d'autant plus que l'inflation est forte.
+    </p>
+  </div>
+
+  {# --- 4. Prix de revient -------------------------------------------- #}
+  <h2 class="section">{{ icone("euro") }} Prix de revient unitaire</h2>
+  <p class="chapeau">
+    Le coût moyen de vos actions quand vous avez acheté en plusieurs fois — le
+    chiffre à connaître avant de savoir si vous êtes en gain ou en perte.
+  </p>
+
+  <div class="calc">
+    <div id="pru-lignes"></div>
+    <button type="button" class="bouton bouton-fantome" id="pru-ajouter">+ Ajouter un achat</button>
+
+    <div class="verdict-geant" style="margin:16px 0 0">
+      <div class="vg-case">
+        <div class="vg-lb">Titres détenus</div>
+        <div class="vg-val" id="pru-qte">—</div>
+      </div>
+      <div class="vg-case">
+        <div class="vg-lb">Montant investi</div>
+        <div class="vg-val" id="pru-total">—</div>
+      </div>
+      <div class="vg-case accent">
+        <div class="vg-lb">Prix de revient unitaire</div>
+        <div class="vg-val" id="pru-moyen">—</div>
+        <div class="vg-note" id="pru-note"></div>
+      </div>
+    </div>
+  </div>
+
+  {# --- 5. Convertisseur ---------------------------------------------- #}
+  <h2 class="section">{{ icone("globe") }} Convertisseur de devises</h2>
+  <p class="chapeau">
+    Les {{ devises | length }} devises de la collecte, franc CFA compris.
+  </p>
+
+  <div class="calc">
+    <div class="calc-champs">
+      <div class="champ">
+        <label for="cv-montant">Montant</label>
+        <input type="number" id="cv-montant" min="0" step="0.01" value="1000">
+      </div>
+      <div class="champ">
+        <label for="cv-de">De</label>
+        <select id="cv-de">
+          {% for d in devises %}
+            <option value="{{ d.code }}" {% if d.code == 'EUR' %}selected{% endif %}>{{ d.code }} — {{ d.nom }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="champ">
+        <label for="cv-vers">Vers</label>
+        <select id="cv-vers">
+          {% for d in devises %}
+            <option value="{{ d.code }}" {% if d.code == 'XOF' %}selected{% endif %}>{{ d.code }} — {{ d.nom }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="calc-sortie">
+        <div class="cs-lb">Résultat</div>
+        <div class="cs-val" id="cv-resultat">—</div>
+      </div>
+    </div>
+    <p class="champ-aide" id="cv-taux" style="margin-top:12px"></p>
+  </div>
+
+  <div class="encart encart-neutre">
+    <p><strong>Ce que ces outils ne remplacent pas.</strong>
+    Une projection n'est pas un conseil. Le rendement passé d'un marché ne
+    préjuge pas du suivant, et aucun de ces calculs ne tient compte de votre
+    situation, de vos charges ni de votre horizon réel. Pour engager votre
+    patrimoine, voyez un conseiller agréé ; pour engager votre religion, un
+    savant qualifié.</p>
+    <p>Voir aussi&nbsp;: <a href="{{ url_for('purification') }}">Purification des
+    dividendes</a> et <a href="{{ url_for('zakat') }}">Zakat sur le patrimoine</a>.</p>
+  </div>
+
+</main>
+
+<script>
+(function () {
+  var TAUX = {{ taux | tojson }};
+
+  function euro(n, d) {
+    return n.toLocaleString('fr-FR', {minimumFractionDigits: d === undefined ? 2 : d,
+                                      maximumFractionDigits: d === undefined ? 2 : d});
+  }
+  function val(id) { return parseFloat(document.getElementById(id).value); }
+  function surSaisie(ids, fn) {
+    ids.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', fn);
+    });
+    fn();
+  }
+
+  // --- 1. Capitalisation -------------------------------------------------
+  // Versements en début de mois, taux annuel converti en taux mensuel
+  // équivalent : (1+r)^(1/12)-1, et non r/12 qui surestime le résultat.
+  function serieCapitalisation(initial, mensuel, tauxAnnuel, annees) {
+    var rm = Math.pow(1 + tauxAnnuel, 1 / 12) - 1;
+    var capital = initial, verse = initial;
+    var serie = [{annee: 0, capital: capital, verse: verse}];
+    for (var mois = 1; mois <= annees * 12; mois++) {
+      capital = (capital + mensuel) * (1 + rm);
+      verse += mensuel;
+      if (mois % 12 === 0) serie.push({annee: mois / 12, capital: capital, verse: verse});
+    }
+    return serie;
+  }
+
+  function dessineCapitalisation(serie) {
+    var hote = document.getElementById('cap-graphe');
+    if (serie.length < 2) { hote.innerHTML = ''; return; }
+    var L = 1000, H = 260, MG = 8, MD = 74, MH = 14, MB = 28;
+    var max = serie[serie.length - 1].capital || 1;
+    var x = function (i) { return MG + (i / (serie.length - 1)) * (L - MG - MD); };
+    var y = function (v) { return MH + (1 - v / max) * (H - MH - MB); };
+
+    var chemin = function (cle) {
+      return serie.map(function (p, i) {
+        return (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p[cle]).toFixed(1);
+      }).join(' ');
+    };
+
+    var svg = ['<svg viewBox="0 0 ' + L + ' ' + H + '" class="courbe" role="img" aria-label="Projection du capital">'];
+    svg.push('<defs><linearGradient id="deg-cap" x1="0" y1="0" x2="0" y2="1">' +
+             '<stop offset="0%" class="deg-haut"/><stop offset="100%" class="deg-bas"/></linearGradient></defs>');
+
+    [0, 0.5, 1].forEach(function (f) {
+      var v = max * f;
+      svg.push('<line class="grille" x1="' + MG + '" x2="' + (L - MD) + '" y1="' + y(v).toFixed(1) + '" y2="' + y(v).toFixed(1) + '"/>');
+      svg.push('<text class="axe-y" x="' + (L - MD + 9) + '" y="' + (y(v) + 4).toFixed(1) + '">' +
+               (v >= 1000 ? Math.round(v / 1000) + 'k' : Math.round(v)) + ' €</text>');
+    });
+
+    svg.push('<path d="' + chemin('capital') + ' L' + x(serie.length - 1).toFixed(1) + ' ' + (H - MB) +
+             ' L' + MG + ' ' + (H - MB) + ' Z" fill="url(#deg-cap)"/>');
+    svg.push('<path d="' + chemin('capital') + '" class="trait" fill="none" vector-effect="non-scaling-stroke"/>');
+    svg.push('<path d="' + chemin('verse') + '" class="trait-verse" fill="none" vector-effect="non-scaling-stroke"/>');
+
+    [0, Math.floor((serie.length - 1) / 2), serie.length - 1].forEach(function (i, k) {
+      svg.push('<text class="axe-x" x="' + x(i).toFixed(1) + '" y="' + (H - 8) +
+               '" text-anchor="' + (k === 0 ? 'start' : k === 2 ? 'end' : 'middle') + '">' +
+               serie[i].annee + ' an' + (serie[i].annee > 1 ? 's' : '') + '</text>');
+    });
+    svg.push('</svg>');
+    hote.innerHTML = svg.join('');
+  }
+
+  surSaisie(['cap-initial', 'cap-mensuel', 'cap-taux', 'cap-annees'], function () {
+    var initial = val('cap-initial') || 0,
+        mensuel = val('cap-mensuel') || 0,
+        taux = (val('cap-taux') || 0) / 100,
+        annees = Math.min(60, Math.max(1, val('cap-annees') || 1));
+
+    var serie = serieCapitalisation(initial, mensuel, taux, annees);
+    var fin = serie[serie.length - 1];
+    var gain = fin.capital - fin.verse;
+
+    document.getElementById('cap-verse').textContent = euro(fin.verse, 0) + ' €';
+    document.getElementById('cap-gain').textContent = euro(gain, 0) + ' €';
+    document.getElementById('cap-final').textContent = euro(fin.capital, 0) + ' €';
+    document.getElementById('cap-note-verse').textContent =
+      mensuel ? euro(mensuel, 0) + ' € par mois pendant ' + annees + ' ans' : 'Versement initial seul.';
+    document.getElementById('cap-note-final').textContent =
+      fin.verse > 0 ? 'Soit ' + euro(fin.capital / fin.verse, 2) + ' fois la somme versée.' : '';
+    dessineCapitalisation(serie);
+  });
+
+  // --- 2. Objectif -------------------------------------------------------
+  surSaisie(['obj-cible', 'obj-initial', 'obj-taux', 'obj-annees'], function () {
+    var cible = val('obj-cible') || 0,
+        initial = val('obj-initial') || 0,
+        taux = (val('obj-taux') || 0) / 100,
+        annees = Math.max(1, val('obj-annees') || 1);
+
+    var n = annees * 12;
+    var rm = Math.pow(1 + taux, 1 / 12) - 1;
+    var restant = cible - initial * Math.pow(1 + rm, n);
+
+    var mensuel;
+    if (restant <= 0) {
+      mensuel = 0;
+    } else if (Math.abs(rm) < 1e-9) {
+      mensuel = restant / n;
+    } else {
+      // Annuité de fin de période capitalisée : M × [((1+r)^n − 1) / r] × (1+r)
+      mensuel = restant / ((Math.pow(1 + rm, n) - 1) / rm * (1 + rm));
+    }
+
+    document.getElementById('obj-mensuel').textContent = euro(mensuel, 0) + ' €';
+    document.getElementById('obj-note').textContent = restant <= 0
+      ? 'Votre épargne actuelle suffit déjà à atteindre cet objectif dans le délai fixé.'
+      : 'Soit ' + euro(mensuel * n, 0) + ' € versés au total, pour ' + euro(cible, 0) +
+        ' € au terme : la capitalisation apporte le reste.';
+  });
+
+  // --- 3. Rendement réel -------------------------------------------------
+  surSaisie(['re-nominal', 're-inflation'], function () {
+    var nominal = (val('re-nominal') || 0) / 100,
+        inflation = (val('re-inflation') || 0) / 100;
+    var reel = (1 + nominal) / (1 + inflation) - 1;
+    var el = document.getElementById('re-reel');
+    el.textContent = (reel >= 0 ? '+' : '−') + euro(Math.abs(reel) * 100, 2) + ' %';
+    el.style.color = reel >= 0 ? 'var(--vert)' : 'var(--rouge)';
+    document.getElementById('re-boite').style.borderColor =
+      reel >= 0 ? 'var(--vert-bord)' : 'var(--rouge-bord)';
+  });
+
+  // --- 4. Prix de revient ------------------------------------------------
+  var achats = [{qte: '', prix: ''}];
+
+  function rendPru() {
+    var hote = document.getElementById('pru-lignes');
+    hote.innerHTML = '';
+    achats.forEach(function (a, i) {
+      var bloc = document.createElement('div');
+      bloc.className = 'calc-champs';
+      bloc.style.marginBottom = '12px';
+      bloc.innerHTML =
+        '<div class="champ"><label>Quantité</label>' +
+        '<input type="number" min="0" step="1" value="' + (a.qte || '') + '" data-i="' + i + '" data-c="qte" placeholder="ex. 25"></div>' +
+        '<div class="champ"><label>Prix unitaire (€)</label>' +
+        '<input type="number" min="0" step="0.01" value="' + (a.prix || '') + '" data-i="' + i + '" data-c="prix" placeholder="ex. 120,50"></div>' +
+        '<div class="champ" style="flex:0 0 auto"><label>&nbsp;</label>' +
+        '<button type="button" class="lien-bouton" data-retirer="' + i + '" style="padding:10px 0">Retirer</button></div>';
+      hote.appendChild(bloc);
+    });
+
+    hote.querySelectorAll('input[data-c]').forEach(function (el) {
+      el.addEventListener('input', function () {
+        achats[+el.dataset.i][el.dataset.c] = el.value;
+        calculePru();
+      });
+    });
+    hote.querySelectorAll('[data-retirer]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        achats.splice(+b.dataset.retirer, 1);
+        if (!achats.length) achats.push({qte: '', prix: ''});
+        rendPru(); calculePru();
+      });
+    });
+  }
+
+  function calculePru() {
+    var qte = 0, total = 0;
+    achats.forEach(function (a) {
+      var q = parseFloat(a.qte), p = parseFloat(a.prix);
+      if (isFinite(q) && isFinite(p)) { qte += q; total += q * p; }
+    });
+    document.getElementById('pru-qte').textContent = qte ? euro(qte, 0) : '—';
+    document.getElementById('pru-total').textContent = total ? euro(total) + ' €' : '—';
+    document.getElementById('pru-moyen').textContent = qte ? euro(total / qte) + ' €' : '—';
+    document.getElementById('pru-note').textContent = qte
+      ? 'Au-dessus de ce cours vous êtes en gain, en dessous en perte — hors frais et fiscalité.'
+      : 'Saisissez au moins un achat.';
+  }
+
+  document.getElementById('pru-ajouter').addEventListener('click', function () {
+    achats.push({qte: '', prix: ''});
+    rendPru();
+  });
+  rendPru(); calculePru();
+
+  // --- 5. Convertisseur --------------------------------------------------
+  surSaisie(['cv-montant', 'cv-de', 'cv-vers'], function () {
+    var montant = val('cv-montant');
+    var de = document.getElementById('cv-de').value,
+        vers = document.getElementById('cv-vers').value;
+    var td = TAUX[de], tv = TAUX[vers];
+
+    if (!isFinite(montant) || !td || !tv) {
+      document.getElementById('cv-resultat').textContent = '—';
+      document.getElementById('cv-taux').textContent = '';
+      return;
+    }
+    // On passe par l'euro : les taux collectés sont tous EUR → devise.
+    var enEuros = montant / td;
+    var resultat = enEuros * tv;
+    document.getElementById('cv-resultat').textContent = euro(resultat) + ' ' + vers;
+    document.getElementById('cv-taux').textContent =
+      '1 ' + de + ' = ' + euro(tv / td, 6).replace(/0+$/, '').replace(/,$/, '') + ' ' + vers +
+      ' · taux de la dernière collecte, à titre indicatif.';
+  });
+})();
+</script>
+{% endblock %}
