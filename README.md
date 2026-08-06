@@ -104,16 +104,27 @@ app.py                  routes Flask, filtres de rendu
 refresh.py              collecte l'univers dans le cache
 charts.py               projection SVG de la courbe de cours
 screening/
-  standards.py          seuils et dénominateurs des trois standards
+  standards.py          seuils et dénominateurs des six standards
   sectors.py            filtre sectoriel (exclu / à vérifier / ok)
   engine.py             applique un standard à une société → verdict
   analyses.py           lectures à l'échelle de l'univers entier
+  vocabulaire.py        secteurs et industries traduits (FR/EN)
+  alias.py              noms usuels et recherche sans accents
 data/
   universe.py           les places de marché et leurs valeurs
   yahoo.py              collecte (bilan daté + capitalisation + actualités)
+  presse.py             flux RSS francophones, en trois rubriques
   fx.py                 taux de change, cours de l'or et de l'argent
   cache.py              cache disque en deux étages
 ```
+
+**La recherche.** Yahoo connaît « Saudi Arabian Oil Company » ; personne ne
+cherche autre chose qu'« Aramco ». `screening/alias.py` porte les noms usuels
+— marque commerciale, ancien nom, sigle en usage, translittération — et
+dépouille les clés de leurs accents, des deux côtés : « hermes » trouve
+Hermès, « socgen » trouve la Société Générale. Rien qui devine : « pétrole »
+ne renvoie pas à TotalEnergies, parce qu'un moteur qui extrapole finit par se
+tromper.
 
 Le cache est scindé : `cache/index.json` porte l'essentiel de chaque valeur et
 sert toutes les pages de liste ; `cache/valeurs/<symbole>.json` porte le détail

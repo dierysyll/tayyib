@@ -233,7 +233,7 @@ NEW_YORK = [
     "SBUX", "F", "GM", "UPS", "FDX", "PYPL", "UBER", "ABNB", "SHW",
     "CTAS", "DXCM", "IDXX", "ANET", "FTNT", "CRWD", "DDOG", "SNOW",
     "WDAY", "ADSK", "EA", "TTWO", "PLTR", "DELL", "HPQ", "WDC", "STX",
-    "ON", "MCHP", "NXPI", "ARM", "COIN", "HOOD", "RBLX", "SMCI",
+    "ON", "MCHP", "NXPI", "ARM", "COIN", "HOOD", "RBLX", "SMCI", "BA",
 ]
 
 TORONTO = [

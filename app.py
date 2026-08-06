@@ -15,7 +15,7 @@ from flask import Flask, abort, jsonify, render_template, request
 
 import charts
 from data import cache, fx, presse, universe, yahoo
-from screening import analyses, engine, standards, vocabulaire
+from screening import alias, analyses, engine, standards, vocabulaire
 
 app = Flask(__name__)
 
@@ -429,13 +429,16 @@ def api_recherche():
     valeurs, _, _ = cache.index()
     standard_id = _standard_demande()
 
+    # Les clés sont dépouillées de leurs accents et enrichies des noms
+    # usuels : personne ne cherche « Saudi Arabian Oil Company », et
+    # personne ne tape l'accent grave de « Hermès ».
     entrees = [
         {
             "type": "valeur",
             "libelle": v["nom"],
             "detail": f'{v["ticker"]} · {vocabulaire.activite(v, langue) or ""}'.strip(" ·"),
             "url": f'/valeur/{v["ticker"]}?standard={standard_id}',
-            "cle": f'{v["nom"]} {v["ticker"]}'.lower(),
+            "cle": alias.cle_recherche(v),
             "poids": v.get("market_cap_eur") or 0,
         }
         for v in valeurs
@@ -447,7 +450,7 @@ def api_recherche():
             "libelle": f'{p["drapeau"]} {p["nom"]}',
             "detail": f'{p["pays"]} · {p["indice"]}',
             "url": f'/place/{pid}?standard={standard_id}',
-            "cle": f'{p["nom"]} {p["pays"]} {p["indice"]}'.lower(),
+            "cle": alias.sans_accents(f'{p["nom"]} {p["pays"]} {p["indice"]} {p["devise"]}'),
             "poids": 1e12,
         }
         for pid, p in universe.PLACES.items()
@@ -460,7 +463,7 @@ def api_recherche():
             "libelle": vocabulaire.secteur(s, langue),
             "detail": "Secteur d'activité",
             "url": f"/?standard={standard_id}&secteur={quote(s)}",
-            "cle": f"{vocabulaire.secteur(s, langue)} {s}".lower(),
+            "cle": alias.sans_accents(f"{vocabulaire.secteur(s, langue)} {s}"),
             "poids": 5e11,
         }
         for s in secteurs
@@ -468,7 +471,7 @@ def api_recherche():
 
     entrees += [
         {"type": "page", "libelle": libelle, "detail": detail, "url": url,
-         "cle": f"{libelle} {detail}".lower(), "poids": 9e11}
+         "cle": alias.sans_accents(f"{libelle} {detail}"), "poids": 9e11}
         for libelle, detail, url in [
             ("Screener", "Filtrer l'univers", "/"),
             ("Analyses", "Basculements, palmarès, désaccords", "/analyses"),

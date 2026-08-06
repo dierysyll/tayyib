@@ -89,8 +89,15 @@
       .catch(function () { entrees = []; return entrees; });
   }
 
+  // Les clés de l'index sont déjà dépouillées de leurs accents côté
+  // serveur ; la saisie doit l'être identiquement, sinon « hermes » ne
+  // rejoindrait jamais « Hermès ».
+  function sansAccents(t) {
+    return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+
   function cherche(terme) {
-    terme = terme.trim().toLowerCase();
+    terme = sansAccents(terme.trim());
     if (!terme) return [];
     // Un début de mot vaut mieux qu'une occurrence au milieu : « ora »
     // doit proposer Orange avant Sonatel. À rang égal, la plus grosse
