@@ -17,7 +17,7 @@ from flask import Flask, abort, jsonify, render_template, request
 
 import charts
 from data import cache, fx, presse, universe, yahoo
-from screening import alias, analyses, engine, standards, vocabulaire
+from screening import alias, analyses, engine, notation, standards, vocabulaire
 
 app = Flask(__name__)
 
@@ -75,10 +75,14 @@ PAR_PAGE = 120
 def _univers(standard_id):
     """L'univers évalué selon un standard, avec la date de collecte."""
     valeurs, fetched_at, taux = cache.index()
-    evaluees = [
-        {"societe": s, "resultat": engine.evaluate(s, standard_id)}
-        for s in valeurs
-    ]
+    evaluees = []
+    for s in valeurs:
+        resultat = engine.evaluate(s, standard_id)
+        evaluees.append({
+            "societe": s,
+            "resultat": resultat,
+            "note": notation.note(resultat),
+        })
     return evaluees, fetched_at, taux
 
 
@@ -161,9 +165,20 @@ def accueil():
         key=lambda s: vocabulaire.secteur(s, langue).lower(),
     )
 
+    # Bandeau et palmarès : ils portent sur le périmètre choisi, pour qu'un
+    # lecteur qui a filtré sur Riyad ne voie pas défiler des valeurs de Paris.
+    mobiles = [e for e in portee if e["societe"].get("variation") is not None]
+    par_variation = sorted(mobiles, key=lambda e: -e["societe"]["variation"])
+
     return render_template(
         "index.html",
         evaluees=evaluees,
+        bandeau=_trier(
+            [e for e in portee if e["societe"].get("variation") is not None],
+            "capitalisation",
+        )[:26],
+        hausses=par_variation[:6],
+        baisses=list(reversed(par_variation[-6:])),
         compteurs=compteurs,
         total=len(portee),
         total_univers=len(tous),
@@ -267,9 +282,16 @@ def valeur(ticker):
                 "cours_actuel": societe.get("prix"),
             }
 
+    # Les dépêches déjà collectées pour cette valeur. Les autres sont
+    # chargées à la demande par l'onglet Actualités.
+    depeches, _ = cache.actus()
+    depeches = [a for a in depeches if a.get("ticker") == societe["ticker"]]
+
     return render_template(
         "valeur.html",
         bascule_cours=bascule_cours,
+        note=notation.note(resultat),
+        depeches=depeches,
         societe=societe,
         place=universe.PLACES.get(societe.get("place")),
         resultat=resultat,

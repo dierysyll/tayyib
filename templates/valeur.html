@@ -413,6 +413,35 @@
     </script>
   {% endif %}
 
+  {% if note %}
+    <div class="note-bloc">
+      <span class="note-geante n-{{ note.famille }}">{{ note.lettre }}</span>
+      <span class="note-corps">
+        <span class="note-titre">Marge de conformité — {{ (note.marge * 100) | round | int }} % encore disponible</span>
+        <span class="note-texte">{{ note.resume }}</span>
+        <span class="note-jauge">
+          <span class="note-part p-{{ note.famille }}" style="width:{{ (note.marge * 100) | round(1) }}%"></span>
+        </span>
+      </span>
+    </div>
+    <p class="graphique-note" style="margin:-6px 0 0">
+      Cette note mesure <strong>uniquement</strong> la distance aux seuils de
+      {{ standard.label }} : le ratio le plus contraignant consomme
+      {{ (note.tension * 100) | round | int }} % de la marge autorisée. Ce n'est
+      <strong>pas</strong> une note de qualité d'investissement — elle ne dit rien
+      de la rentabilité, de la valorisation ni des perspectives de la société.
+      Une entreprise sans dette et sans bénéfices obtiendrait A+.
+    </p>
+  {% endif %}
+
+  <div class="onglets" role="tablist">
+    <button type="button" class="on" data-panneau="conformite" role="tab" aria-selected="true">Conformité</button>
+    <button type="button" data-panneau="finances" role="tab" aria-selected="false">Finances</button>
+    <button type="button" data-panneau="actualites" role="tab" aria-selected="false">Actualités</button>
+  </div>
+
+  <div class="panneau" id="p-conformite" role="tabpanel">
+
   {% if resultat.ratios %}
     <h2 class="section">Ratios financiers — {{ standard.full }}</h2>
     <div class="ratios">
@@ -491,6 +520,10 @@
     </p>
   {% endif %}
 
+  </div>
+
+  <div class="panneau" id="p-finances" role="tabpanel" hidden>
+
   {# --- Valorisation -------------------------------------------------- #}
   {% set v = societe.valorisation or {} %}
   {% if v.per or v.price_to_book or v.ev_ebitda %}
@@ -555,6 +588,10 @@
       </table>
     </div>
   {% endif %}
+
+  </div>
+
+  <div class="panneau" id="p-conformite" role="tabpanel">
 
   {% if resultat.sector_reason and resultat.sector_reason != resultat.raison %}
     <h2 class="section">Filtre sectoriel</h2>
@@ -631,6 +668,36 @@
     <p class="chapeau" style="max-width:68ch">{{ societe.resume[:700] }}{% if societe.resume | length > 700 %}…{% endif %}</p>
   {% endif %}
 
+  </div>
+
+  <div class="panneau" id="p-actualites" role="tabpanel" hidden>
+    <h2 class="section">Dépêches sur cette valeur</h2>
+    <div id="fil-valeur">
+      {% if depeches %}
+        <div class="fil">
+          {% for a in depeches %}
+            <a class="actu" href="{{ a.lien }}" target="_blank" rel="noopener noreferrer">
+              <div class="actu-tete">
+                {% if a.source %}<span class="actu-source">{{ a.source }}</span>{% endif %}
+                {% if a.publie %}<span>{{ a.publie | date_fr }}</span>{% endif %}
+              </div>
+              <div class="actu-titre">{{ a.titre }}</div>
+              {% if a.resume %}<p class="actu-resume">{{ a.resume }}</p>{% endif %}
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="vide">Aucune dépêche collectée pour cette valeur.</p>
+      {% endif %}
+    </div>
+    <div class="encart encart-neutre">
+      <p><strong>Ces dépêches viennent de Yahoo Finance, en anglais.</strong>
+      C'est la seule source qui sache rattacher un article à une société précise ;
+      pour de l'actualité en français, voyez la rubrique
+      <a href="{{ url_for('actualites') }}">Actualités</a>.</p>
+    </div>
+  </div>
+
 </main>
 
 <script>
@@ -649,5 +716,34 @@
     div.addEventListener('input', calcule);
     part.addEventListener('input', calcule);
   })();
+</script>
+
+<script>
+// Onglets. Deux panneaux portent l'identifiant « p-conformite » — les
+// ratios d'un côté, le filtre sectoriel et la comparaison de l'autre —
+// parce que les Finances s'intercalent entre les deux dans le flux du
+// document. On bascule donc sur tous les panneaux d'un même nom.
+(function () {
+  var barre = document.querySelector('.onglets');
+  if (!barre) return;
+  var panneaux = document.querySelectorAll('.panneau');
+
+  barre.addEventListener('click', function (e) {
+    var bouton = e.target.closest('button[data-panneau]');
+    if (!bouton) return;
+    var cible = bouton.dataset.panneau;
+
+    barre.querySelectorAll('button').forEach(function (b) {
+      var actif = b === bouton;
+      b.classList.toggle('on', actif);
+      b.setAttribute('aria-selected', String(actif));
+    });
+    panneaux.forEach(function (p) {
+      p.hidden = p.id !== 'p-' + cible;
+    });
+    // Le graphique vit hors des panneaux : il reste visible en permanence,
+    // ce qui est voulu — c'est le repère commun aux trois onglets.
+  });
+})();
 </script>
 {% endblock %}

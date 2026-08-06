@@ -57,7 +57,7 @@ CHAMPS_INDEX = (
     "ticker", "nom", "place", "sector", "industry", "currency", "pays",
     "market_cap", "market_cap_eur", "prix", "rendement",
     "dividende_par_action", "total_debt", "cash_and_investments",
-    "receivables", "total_assets", "bilan_date", "historique",
+    "receivables", "total_assets", "bilan_date", "historique", "variation",
 )
 
 
@@ -81,9 +81,29 @@ def _nom_fichier(ticker):
     return "".join(c if c.isalnum() or c in "-_." else "_" for c in ticker) + ".json"
 
 
+def _variation(cours):
+    """La variation du cours sur le dernier pas de la série.
+
+    Calculée ici, à l'écriture de l'index, plutôt que collectée : la série
+    hebdomadaire est déjà sur disque pour chaque valeur, et la relire coûte
+    zéro requête. Yahoo expose bien une variation du jour, mais la prendre
+    supposerait de recollecter mille valeurs pour un chiffre qu'on peut
+    déduire. C'est donc une variation **hebdomadaire**, et l'interface le
+    dit — annoncer « aujourd'hui » un écart d'une semaine serait faux.
+    """
+    if not cours or len(cours) < 2:
+        return None
+    avant, apres = cours[-2][1], cours[-1][1]
+    if not avant:
+        return None
+    return (apres - avant) / avant
+
+
 def resume_index(societe):
     """La version allégée d'une société, telle qu'elle entre dans l'index."""
-    return {cle: societe.get(cle) for cle in CHAMPS_INDEX}
+    resume = {cle: societe.get(cle) for cle in CHAMPS_INDEX}
+    resume["variation"] = societe.get("variation", _variation(societe.get("cours")))
+    return resume
 
 
 def save_detail(societe):

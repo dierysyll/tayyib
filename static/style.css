@@ -775,6 +775,93 @@ td.depasse { color: var(--rouge); }
 .place-ecusson.pays-asie-afrique { background: var(--asie-fond); color: var(--asie); }
 
 
+/* --- Note de marge de conformité ---------------------------------------- */
+/* Trois familles de couleur, pas neuf : la lettre porte la précision, la
+   teinte porte le coup d'œil. */
+
+.note {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 34px; height: 24px; padding: 0 8px; border-radius: 7px;
+  font-size: 13px; font-weight: 720; letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.n-haute { background: var(--vert-fond); color: var(--vert); border: 1px solid var(--vert-bord); }
+.n-moyenne { background: var(--ambre-fond); color: var(--ambre); border: 1px solid var(--ambre-bord); }
+.n-faible { background: var(--rouge-fond); color: var(--rouge); border: 1px solid var(--rouge-bord); }
+.note-absente { color: var(--texte-faible); font-size: 13px; }
+
+/* Sur la fiche, la note devient un bloc avec sa jauge de marge. */
+.note-bloc {
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 18px; background: var(--surface);
+  border: 1px solid var(--bord); border-radius: var(--rayon);
+  box-shadow: var(--ombre); margin: 16px 0;
+}
+.note-geante {
+  display: grid; place-items: center; width: 58px; height: 58px;
+  border-radius: 14px; font-size: 22px; font-weight: 760; flex-shrink: 0;
+}
+.note-corps { flex: 1; min-width: 0; }
+.note-titre { font-size: 14px; font-weight: 640; margin-bottom: 3px; }
+.note-texte { font-size: 13px; color: var(--texte-doux); line-height: 1.5; }
+.note-jauge { height: 7px; background: var(--surface-3); border-radius: 4px; overflow: hidden; margin-top: 9px; }
+.note-part { display: block; height: 100%; border-radius: 4px; }
+.n-haute .note-part, .note-part.p-haute { background: linear-gradient(90deg, var(--vert), var(--jade)); }
+.note-part.p-moyenne { background: var(--ambre); }
+.note-part.p-faible { background: var(--rouge); }
+
+
+/* --- Bandeau de cotations ------------------------------------------------ */
+/* Un ruban qui défile en continu. Il duplique sa propre liste pour que la
+   boucle se referme sans saut visible. */
+
+.bandeau {
+  overflow: hidden; border-block: 1px solid var(--bord);
+  background: var(--surface); margin-bottom: 22px;
+}
+.bandeau-piste {
+  display: flex; gap: 26px; width: max-content;
+  padding: 10px 0; animation: defile 90s linear infinite;
+}
+.bandeau:hover .bandeau-piste { animation-play-state: paused; }
+@keyframes defile { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+.bandeau-item {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13px; text-decoration: none; white-space: nowrap;
+}
+.bandeau-sym { font-weight: 680; }
+.bandeau-var { font-variant-numeric: tabular-nums; font-weight: 620; }
+.bandeau-pastille {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.bp-conforme { background: var(--vert); }
+.bp-a_verifier { background: var(--ambre); }
+.bp-non_conforme { background: var(--rouge); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bandeau-piste { animation: none; }
+  .bandeau { overflow-x: auto; }
+}
+
+
+/* --- Onglets ------------------------------------------------------------- */
+
+.onglets {
+  display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;
+  border-bottom: 1px solid var(--bord); margin: 26px 0 20px;
+}
+.onglets::-webkit-scrollbar { display: none; }
+.onglets button {
+  padding: 11px 16px; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 14.5px; font-weight: 580; color: var(--texte-doux);
+  border-bottom: 2px solid transparent; white-space: nowrap; margin-bottom: -1px;
+}
+.onglets button:hover { color: var(--texte); }
+.onglets button.on { color: var(--jade); border-bottom-color: var(--jade); font-weight: 660; }
+.panneau[hidden] { display: none; }
+
+
 /* --- Recherche globale ------------------------------------------------- */
 /* Une seule entrée pour tout atteindre — une valeur, une place, un secteur,
    une page. Le lecteur qui cherche « Aramco » ou « Kuala Lumpur » ne devrait
@@ -1010,13 +1097,15 @@ td.depasse { color: var(--rouge); }
   .compteur-nb { font-size: 26px; }
 
   /* Le verdict est la colonne pour laquelle on vient : elle doit tenir
-     sans défilement horizontal. On ne garde donc que le nom et le verdict.
-     Secteur, place, ratio et capitalisation restent sur la fiche. */
+     sans défilement horizontal. On garde le nom, le verdict et la marge —
+     cette dernière tient en deux caractères et dit l'essentiel. Secteur,
+     place, ratios et capitalisation restent sur la fiche. */
   table { min-width: 0; }
-  th:nth-child(2), td:nth-child(2),
-  th:nth-child(3), td:nth-child(3),
-  th:nth-child(5), td:nth-child(5),
-  th:nth-child(6), td:nth-child(6) { display: none; }
+  .cadre th:nth-child(2), .cadre td:nth-child(2),
+  .cadre th:nth-child(3), .cadre td:nth-child(3),
+  .cadre th:nth-child(6), .cadre td:nth-child(6),
+  .cadre th:nth-child(7), .cadre td:nth-child(7),
+  .cadre th:nth-child(8), .cadre td:nth-child(8) { display: none; }
   th, td { padding-left: 13px; padding-right: 13px; }
 }
 

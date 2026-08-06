@@ -36,6 +36,27 @@
     </div>
   </section>
 
+  {% if bandeau %}
+    <div class="bandeau" aria-label="Cotations de l'univers">
+      {#- La piste est écrite deux fois : l'animation translate de -50 %,
+          donc la seconde copie prend exactement la place de la première et
+          la boucle se referme sans saut. -#}
+      <div class="bandeau-piste">
+        {% for passe in [1, 2] %}
+          {% for e in bandeau %}
+            {% set s = e.societe %}
+            <a class="bandeau-item" href="/valeur/{{ s.ticker }}?standard={{ standard.id }}"
+               {% if passe == 2 %}aria-hidden="true" tabindex="-1"{% endif %}>
+              <span class="bandeau-pastille bp-{{ e.resultat.verdict }}"></span>
+              <span class="bandeau-sym">{{ s.ticker }}</span>
+              <span class="bandeau-var {{ 'hausse' if s.variation >= 0 else 'baisse' }}">{{ s.variation | signe }}</span>
+            </a>
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
   <div class="compteurs">
     <a class="compteur c-tous {% if not filtre %}on{% endif %}" href="{{ lien(verd=none) }}">
       <div class="compteur-nb">{{ total }}</div>
@@ -141,6 +162,7 @@
             <th>Place</th>
             <th>Secteur</th>
             <th>Verdict {{ standard.label }}</th>
+            <th>Marge</th>
             <th class="a-droite">Dette / {{ 'bilan' if standard.denominator == 'total_assets' else 'capi.' }}</th>
             <th class="a-droite">Rendement</th>
             <th class="a-droite">Capitalisation</th>
@@ -166,6 +188,11 @@
               </td>
               <td class="secteur">{{ activite(s) or '—' }}</td>
               <td><span class="verdict v-{{ r.verdict }}">{{ engine.VERDICT_LABELS[r.verdict] }}</span></td>
+              <td>
+                {% if e.note %}
+                  <span class="note n-{{ e.note.famille }}" title="{{ e.note.resume }}">{{ e.note.lettre }}</span>
+                {% else %}<span class="note-absente">—</span>{% endif %}
+              </td>
               <td class="a-droite">{{ (dette.valeur if dette else none) | pourcent }}</td>
               <td class="a-droite">{{ s | rendement }}</td>
               <td class="a-droite">{{ s.market_cap_eur | euros }}</td>
@@ -187,6 +214,39 @@
       {{ par_page }} premières valeurs affichées sur {{ total_filtre }}.
       Affinez par région, par secteur ou par recherche pour voir le reste.
     </p>
+  {% endif %}
+
+  {% if hausses or baisses %}
+    <h2 class="section">Mouvements de la semaine</h2>
+    <div class="grille-analyses">
+      {% for titre, liste, icone_nom, teinte in [
+           ('Plus fortes hausses', hausses, 'hausse', 'i-vert'),
+           ('Plus fortes baisses', baisses, 'baisse', 'i-rouge')] %}
+        <section class="carte">
+          <div class="carte-tete">
+            <div>
+              <h3 class="carte-titre">{{ titre }}</h3>
+              <p class="carte-sous">Sur le dernier pas hebdomadaire de la série de cours.</p>
+            </div>
+            <span class="carte-icone {{ teinte }}">{{ icone(icone_nom) }}</span>
+          </div>
+          <div class="carte-corps">
+            <div class="liste-valeurs">
+              {% for e in liste %}
+                {% set s = e.societe %}
+                <a class="lv-ligne" href="/valeur/{{ s.ticker }}?standard={{ standard.id }}">
+                  <span class="lv-corps">
+                    <span class="lv-nom">{{ s.nom }}</span>
+                    <span class="lv-meta">{{ s.ticker }} · {{ engine.VERDICT_LABELS[e.resultat.verdict] }}</span>
+                  </span>
+                  <span class="lv-val {{ 'hausse' if s.variation >= 0 else 'baisse' }}">{{ s.variation | signe }}</span>
+                </a>
+              {% endfor %}
+            </div>
+          </div>
+        </section>
+      {% endfor %}
+    </div>
   {% endif %}
 
   <div class="encart">
