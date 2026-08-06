@@ -36,6 +36,24 @@
   </div>
 
   <div class="motif m-{{ resultat.verdict }}">{{ resultat.raison }}</div>
+
+  {% if bascule_cours %}
+    <div class="encart">
+      <p><strong>Ce verdict tient au cours, pas aux comptes.</strong>
+      {{ standard.label }} rapporte la dette à la <em>capitalisation boursière</em>.
+      Au dernier arrêté du {{ bascule_cours.date | date_fr }}, avec un cours de
+      {{ bascule_cours.cours_arrete | nombre }} {{ societe.currency }}, cette valeur
+      était <strong>{{ engine.VERDICT_LABELS[bascule_cours.verdict_arrete] | lower }}</strong>.
+      Le cours est depuis à {{ bascule_cours.cours_actuel | nombre }} {{ societe.currency }},
+      ce qui fait passer le ratio de l'autre côté du seuil — sans que rien n'ait changé
+      dans l'entreprise.</p>
+      <p>C'est bien ce que dit le standard, et non un défaut de calcul. Mais la
+      conclusion est <strong>réversible</strong> : une baisse du cours la renverserait.
+      Les standards qui rapportent au total du bilan — MSCI, FTSE, SC Malaisie — ne
+      connaissent pas ce cas, et le tableau de comparaison plus bas montre ce qu'ils
+      concluent.</p>
+    </div>
+  {% endif %}
   {# --- Cours et conformité, sur le même axe -------------------------
 
      Le graphique porte trois informations superposées, et c'est le
@@ -53,12 +71,17 @@
         </h2>
         <p class="graphique-periode" id="periode-lue"></p>
       </div>
-      <div class="periodes" id="periodes">
-        <button type="button" data-jours="30">1 M</button>
-        <button type="button" data-jours="180">6 M</button>
-        <button type="button" data-jours="365" class="on">1 an</button>
-        <button type="button" data-jours="1825">5 ans</button>
-        <button type="button" data-jours="0">Max</button>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button type="button" class="bouton bouton-fantome" id="zoom-reset" hidden>
+          Réinitialiser le zoom
+        </button>
+        <div class="periodes" id="periodes">
+          <button type="button" data-jours="30">1 M</button>
+          <button type="button" data-jours="180">6 M</button>
+          <button type="button" data-jours="365" class="on">1 an</button>
+          <button type="button" data-jours="1825">5 ans</button>
+          <button type="button" data-jours="0">Max</button>
+        </div>
       </div>
     </div>
 
@@ -105,7 +128,11 @@
 
       // Marges : sans elles, les libellés d'axe n'ont nulle part où aller.
       var L = 1000, H = 340, MG = 8, MD = 62, MH = 14, MB = 52;
-      var donnees = null, jours = 365;
+      // `vue` est la tranche réellement affichée. Nulle, on montre toute
+      // la période choisie ; sinon, le sous-ensemble sélectionné à la
+      // souris. Empiler des tranches successives permet de zoomer par
+      // paliers sans recalculer d'indices dans le tableau d'origine.
+      var donnees = null, jours = 365, vue = null, pile = [];
 
       var MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
                   'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
@@ -208,6 +235,8 @@
         // Curseur de lecture.
         svg.push('<line id="viseur" class="viseur" y1="' + MH + '" y2="' + (H - MB) + '" style="display:none"/>');
         svg.push('<circle id="viseur-point" class="viseur-point" r="4" style="display:none"/>');
+        svg.push('<rect id="selection" y="' + MH + '" height="' + (H - MH - MB) +
+                 '" class="selection" style="display:none"/>');
         svg.push('<rect id="zone" x="' + MG + '" y="' + MH + '" width="' + (L - MG - MD) +
                  '" height="' + (H - MH - MB) + '" fill="transparent"/>');
         svg.push('</svg>');
@@ -250,6 +279,70 @@
           bulle.style.left = gauche + 'px';
         }
 
+        // --- Zoom par sélection ------------------------------------------
+        // On tire un rectangle sur la zone à agrandir. C'est le geste
+        // attendu sur un graphique boursier, et il se double d'un zoom à
+        // la molette pour ceux qui le préfèrent.
+        var selection = hote.querySelector('#selection'), depart = null;
+
+        function indiceSous(clientX) {
+          var r = svg.getBoundingClientRect();
+          var frac = (clientX - r.left) / r.width;
+          var i = Math.round(((frac * L) - MG) / (L - MG - MD) * (points.length - 1));
+          return Math.max(0, Math.min(points.length - 1, i));
+        }
+
+        zone.addEventListener('mousedown', function (e) {
+          depart = indiceSous(e.clientX);
+          selection.style.display = '';
+          e.preventDefault();
+        });
+
+        svg.addEventListener('mousemove', function (e) {
+          if (depart === null) return;
+          var i = indiceSous(e.clientX);
+          var a = Math.min(x(depart), x(i)), b = Math.max(x(depart), x(i));
+          selection.setAttribute('x', a);
+          selection.setAttribute('width', Math.max(1, b - a));
+        });
+
+        function finSelection(e) {
+          if (depart === null) return;
+          var fin = indiceSous(e.clientX);
+          selection.style.display = 'none';
+          var a = Math.min(depart, fin), b = Math.max(depart, fin);
+          depart = null;
+          // Moins de trois points sélectionnés : c'était un clic, pas un
+          // geste de zoom. On ne veut pas piéger l'utilisateur.
+          if (b - a >= 3) {
+            pile.push(points);
+            vue = points.slice(a, b + 1);
+            dessine(vue);
+            majBoutonZoom();
+          }
+        }
+        zone.addEventListener('mouseup', finSelection);
+        svg.addEventListener('mouseleave', function () { 
+          depart = null; selection.style.display = 'none';
+        });
+
+        // Molette : on resserre ou on élargit autour du curseur.
+        svg.addEventListener('wheel', function (e) {
+          if (points.length < 8) return;
+          e.preventDefault();
+          var centre = indiceSous(e.clientX);
+          var facteur = e.deltaY < 0 ? 0.75 : 1 / 0.75;
+          var demi = Math.max(3, Math.round((points.length * facteur) / 2));
+          var a = Math.max(0, centre - demi), b = Math.min(points.length - 1, centre + demi);
+          if (b - a < 3) return;
+          var suivant = (b - a + 1 >= points.length && pile.length)
+            ? pile.pop()
+            : points.slice(a, b + 1);
+          vue = suivant;
+          dessine(vue);
+          majBoutonZoom();
+        }, {passive: false});
+
         svg.addEventListener('mousemove', lire);
         svg.addEventListener('touchmove', function (e) {
           if (e.touches[0]) { lire(e.touches[0]); e.preventDefault(); }
@@ -275,7 +368,20 @@
         return coupe.length > 1 ? coupe : source;
       }
 
+      function majBoutonZoom() {
+        var bouton = document.getElementById('zoom-reset');
+        if (bouton) bouton.hidden = vue === null;
+      }
+
+      function reinitialise() {
+        vue = null; pile = [];
+        dessine(fenetre(jours));
+        majBoutonZoom();
+      }
+
       function affiche() {
+        vue = null; pile = [];
+        majBoutonZoom();
         if (donnees) return dessine(fenetre(jours));
         hote.classList.add('chargement');
         fetch('/api/cours/' + encodeURIComponent(TICKER) + '.json')
@@ -284,6 +390,8 @@
             donnees = d;
             hote.classList.remove('chargement');
             dessine(fenetre(jours));
+            var bouton = document.getElementById('zoom-reset');
+            if (bouton) bouton.addEventListener('click', reinitialise);
           })
           .catch(function () {
             hote.classList.remove('chargement');

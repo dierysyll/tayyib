@@ -9,6 +9,8 @@ screening/ (les règles et les analyses), data/ (la collecte) et charts.py
 """
 
 import os
+import threading
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 from flask import Flask, abort, jsonify, render_template, request
@@ -249,8 +251,25 @@ def valeur(ticker):
         jalons=[{"date": h["date"], "verdict": h["verdict"]} for h in historique],
     )
 
+    # Le verdict affiché rapporte le dernier bilan à la capitalisation du
+    # JOUR ; l'historique rapporte ce même bilan à la capitalisation de la
+    # date d'arrêté. Quand les deux divergent, c'est le cours qui a bougé,
+    # et le lecteur doit le savoir : sa conformité est réversible.
+    bascule_cours = None
+    std = standards.get(standard_id)
+    if historique and std["denominator"] == "market_cap":
+        recent = historique[0]
+        if recent["verdict"] != resultat["verdict"]:
+            bascule_cours = {
+                "verdict_arrete": recent["verdict"],
+                "date": recent["date"],
+                "cours_arrete": recent.get("cours"),
+                "cours_actuel": societe.get("prix"),
+            }
+
     return render_template(
         "valeur.html",
+        bascule_cours=bascule_cours,
         societe=societe,
         place=universe.PLACES.get(societe.get("place")),
         resultat=resultat,
@@ -292,6 +311,46 @@ def analyses_page():
     )
 
 
+# --- Fraîcheur du fil de presse -----------------------------------------
+#
+# Les cours et les bilans se collectent hors ligne : ils changent lentement,
+# et interroger Yahoo mille fois par visite serait absurde. La presse, non.
+# Un fil d'actualité qui date de la dernière commande lancée à la main n'est
+# pas un fil d'actualité.
+#
+# Onze flux RSS coûtent quelques secondes — trop pour les faire attendre au
+# visiteur, assez peu pour les rafraîchir en tâche de fond dès que le cache
+# a vieilli. Celui qui arrive lit la version précédente ; le suivant a la
+# nouvelle.
+
+PRESSE_FRAICHEUR = timedelta(minutes=30)
+_presse_en_cours = threading.Lock()
+
+
+def _rafraichir_presse_si_besoin():
+    _, collecte = cache.presse()
+    if collecte and datetime.now(timezone.utc) - collecte < PRESSE_FRAICHEUR:
+        return
+    # `acquire(blocking=False)` : si un rafraîchissement tourne déjà, on
+    # laisse tomber plutôt que d'en empiler un par visiteur.
+    if not _presse_en_cours.acquire(blocking=False):
+        return
+
+    def travail():
+        try:
+            articles = presse.collecte()
+            if articles:
+                cache.save_presse(articles)
+        except Exception:
+            # Un flux qui tombe ne doit pas faire tomber la page : on garde
+            # la version précédente et on réessaiera au prochain passage.
+            pass
+        finally:
+            _presse_en_cours.release()
+
+    threading.Thread(target=travail, daemon=True).start()
+
+
 @app.route("/actualites")
 def actualites():
     """Deux fils, volontairement distincts.
@@ -305,6 +364,7 @@ def actualites():
     standard_id = _standard_demande()
     rubrique = request.args.get("rubrique", "marches")
 
+    _rafraichir_presse_si_besoin()
     articles_presse, collecte_presse = cache.presse()
     depeches, collecte_yahoo = cache.actus()
 

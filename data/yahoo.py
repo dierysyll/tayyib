@@ -216,7 +216,7 @@ def fetch(ticker):
     compte = _appel(lambda: t.income_stmt)
 
     if bilan is not None and not bilan.empty:
-        for i, colonne in enumerate(bilan.columns):
+        for colonne in bilan.columns:
             periode = {"date": colonne.date().isoformat()}
             for cle, noms in BILAN_ROWS.items():
                 periode[cle] = _pick(bilan, colonne, noms)
@@ -239,9 +239,16 @@ def fetch(ticker):
             )
             societe["historique"].append(periode)
 
-            # L'exercice le plus récent alimente aussi les champs « courants »,
+            # Le premier exercice *retenu* alimente les champs « courants »,
             # ceux qui servent au verdict affiché par défaut.
-            if i == 0:
+            #
+            # « Retenu », et non « premier de la liste » : Yahoo publie
+            # parfois une colonne de tête vide, qu'on écarte plus haut. La
+            # version précédente testait l'indice d'énumération, si bien que
+            # la fiche restait sans bilan — donc « à vérifier » — alors que
+            # l'historique en portait un et concluait « conforme ». Les deux
+            # écrans se contredisaient sur la même société.
+            if len(societe["historique"]) == 1:
                 societe["bilan_date"] = periode["date"]
                 for cle in BILAN_ROWS:
                     societe[cle] = periode[cle]

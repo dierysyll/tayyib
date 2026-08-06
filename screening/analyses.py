@@ -51,17 +51,27 @@ def _rendement(valeur):
 
 
 def changements(valeurs, standard_id):
-    """Les valeurs dont le verdict a basculé au dernier arrêté comptable.
+    """Les valeurs dont le verdict a basculé depuis l'exercice précédent.
 
-    On compare le verdict de l'exercice le plus récent à celui de
-    l'exercice précédent, tous deux calculés sur leurs propres chiffres
-    (voir engine.historique_conformite). Une entrée en conformité est une
-    occasion ; une sortie est une obligation d'arbitrer.
+    L'état d'arrivée est **le verdict affiché partout ailleurs** —
+    `engine.evaluate`, dernier bilan rapporté à la capitalisation du jour.
+    Ce n'est pas un détail de mise en œuvre : une version antérieure
+    comparait deux exercices reconstitués, et pouvait donc annoncer « sortie
+    de conformité » sur une valeur dont la fiche affichait « conforme ».
+    DSM-Firmenich en était l'exemple — 30,6 % de dette au 31/12/2025 quand
+    le cours valait 68,84 €, 22,9 % aujourd'hui à 93,20 €. Les deux calculs
+    étaient justes ; leur cohabitation ne l'était pas.
 
-    Limite assumée, la même que pour l'historique : le filtre sectoriel
-    appliqué aux deux exercices est celui d'aujourd'hui. Un basculement
-    signalé ici vient donc toujours des ratios, jamais d'un changement
-    d'activité — ce qui est précisément ce qu'on veut suivre.
+    Deux causes possibles à un basculement, et il faut les distinguer :
+
+      bilan   la société s'est désendettée, ou l'inverse. Le changement est
+              durable et vient de l'entreprise ;
+      cours   les ratios sont les mêmes, mais le dénominateur a bougé. Sur
+              les standards qui divisent par la capitalisation boursière
+              (AAOIFI, Dow Jones, S&P), une hausse du cours suffit à faire
+              repasser une valeur sous le seuil. Ce n'est pas un artefact :
+              c'est ce que dit le standard. Mais c'est réversible, et
+              l'utilisateur doit le savoir avant d'acheter.
     """
     entrees, sorties = [], []
 
@@ -70,20 +80,28 @@ def changements(valeurs, standard_id):
         if len(serie) < 2:
             continue
 
+        actuel = engine.evaluate(valeur, standard_id)["verdict"]
         recent, precedent = serie[0], serie[1]
-        if recent["verdict"] == precedent["verdict"]:
+
+        if actuel == precedent["verdict"]:
             continue
+
+        # Si l'exercice le plus récent, jugé sur ses propres chiffres, donne
+        # déjà le verdict actuel, c'est le bilan qui a changé. Sinon, c'est
+        # le cours qui a fait basculer le dénominateur depuis l'arrêté.
+        cause = "bilan" if recent["verdict"] == actuel else "cours"
 
         mouvement = {
             "societe": valeur,
             "avant": precedent["verdict"],
-            "apres": recent["verdict"],
+            "apres": actuel,
+            "cause": cause,
             "date": recent["date"],
             "annee_avant": precedent["annee"],
             "annee_apres": recent["annee"],
         }
 
-        if recent["verdict"] == engine.CONFORME:
+        if actuel == engine.CONFORME:
             entrees.append(mouvement)
         elif precedent["verdict"] == engine.CONFORME:
             sorties.append(mouvement)

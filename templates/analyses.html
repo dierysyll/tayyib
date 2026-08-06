@@ -57,7 +57,8 @@
             {% for m in entrees %}
               {{ ligne_valeur(m.societe, none,
                               m.societe.market_cap_eur | euros,
-                              m.annee_avant ~ ' → ' ~ m.annee_apres) }}
+                              m.annee_avant ~ ' → ' ~ m.annee_apres ~ ' · ' ~
+                              ('bilan' if m.cause == 'bilan' else 'cours')) }}
             {% endfor %}
           </div>
         {% else %}
@@ -84,7 +85,8 @@
             {% for m in sorties %}
               {{ ligne_valeur(m.societe, none,
                               m.societe.market_cap_eur | euros,
-                              m.annee_avant ~ ' → ' ~ m.annee_apres) }}
+                              m.annee_avant ~ ' → ' ~ m.annee_apres ~ ' · ' ~
+                              ('bilan' if m.cause == 'bilan' else 'cours')) }}
             {% endfor %}
           </div>
         {% else %}
@@ -96,10 +98,21 @@
 
   <div class="encart">
     <p><strong>Comment lire ces deux listes.</strong>
-    Chaque exercice est jugé sur ses propres chiffres — dette, trésorerie et créances
-    de l'arrêté, rapportées à la capitalisation reconstituée à cette date. En revanche,
-    le filtre sectoriel appliqué est celui d'aujourd'hui : un basculement signalé ici
-    vient donc toujours des ratios, jamais d'un changement d'activité.</p>
+    L'état d'arrivée est le verdict affiché sur la fiche de la valeur — dernier bilan
+    publié, rapporté à la capitalisation du jour. L'état de départ est l'exercice
+    précédent, jugé sur ses propres chiffres.</p>
+    <p>La mention en fin de ligne dit <strong>d'où vient le basculement</strong>, et la
+    distinction est importante :</p>
+    <p><strong>bilan</strong> — la société s'est désendettée, ou l'inverse. Le
+    changement vient de l'entreprise, il est durable.<br>
+    <strong>cours</strong> — les comptes n'ont pas bougé, le cours si. Les standards
+    qui divisent par la capitalisation boursière (AAOIFI, Dow Jones, S&amp;P) font
+    alors basculer le verdict sans qu'il ne se soit rien passé dans l'entreprise.
+    Ce n'est pas un défaut de calcul, c'est ce que dit le standard — mais c'est
+    réversible, et il faut le savoir avant d'acheter. Les standards qui divisent par
+    le total du bilan (MSCI, FTSE, SC Malaisie) n'ont jamais ce cas.</p>
+    <p>Le filtre sectoriel appliqué reste celui d'aujourd'hui : aucun basculement
+    listé ici ne vient d'un changement d'activité.</p>
   </div>
 
   {# --- Palmarès -------------------------------------------------------- #}
