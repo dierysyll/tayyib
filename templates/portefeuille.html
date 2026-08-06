@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block titre %}Portefeuille{% endblock %}
+
+{% block contenu %}
+<main class="page">
+
+  <h1 class="titre-page">Votre portefeuille</h1>
+  <p class="chapeau">
+    Saisissez vos lignes : Tayyib calcule la part conforme de votre portefeuille
+    selon {{ standard.full }}, et vous dit quelles positions posent problème.
+  </p>
+
+  <div class="encart encart-neutre">
+    <p><strong>Rien ne quitte votre navigateur.</strong>
+    Vos lignes sont enregistrées en local, sur cet appareil. Il n'y a ni compte,
+    ni inscription, ni envoi au serveur — un screener n'a pas besoin de savoir ce
+    que vous détenez, et ne pas collecter une donnée reste la seule façon
+    certaine de ne pas la perdre.</p>
+  </div>
+
+  <div class="outils">
+    <div class="segments">
+      {% for sid, std in standards.items() %}
+        <a href="?standard={{ sid }}" class="{% if sid == standard.id %}on{% endif %}">{{ std.label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="calc" style="margin-bottom:18px">
+    <div class="calc-champs">
+      <div class="champ" style="flex:2 1 240px">
+        <label for="pf-valeur">Valeur</label>
+        <select id="pf-valeur"><option value="">Chargement…</option></select>
+      </div>
+      <div class="champ">
+        <label for="pf-qte">Nombre d'actions</label>
+        <input type="number" id="pf-qte" min="0" step="1" placeholder="ex. 25">
+      </div>
+      <div class="champ" style="flex:0 0 auto">
+        <button class="bouton" id="pf-ajouter" type="button">Ajouter la ligne</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pf-vide" class="cadre">
+    <p class="vide">Aucune ligne pour le moment. Ajoutez une première valeur ci-dessus.</p>
+  </div>
+
+  <div id="pf-resultats" hidden>
+    <div class="compteurs" id="pf-compteurs"></div>
+
+    <div class="cadre defilement">
+      <table>
+        <thead>
+          <tr>
+            <th>Valeur</th>
+            <th>Verdict {{ standard.label }}</th>
+            <th class="a-droite">Actions</th>
+            <th class="a-droite">Valorisation</th>
+            <th class="a-droite">Poids</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="pf-lignes"></tbody>
+      </table>
+    </div>
+
+    <div class="encart" id="pf-alerte" hidden></div>
+
+    <p class="pied-liens" style="margin-top:14px">
+      <button class="lien-bouton" id="pf-vider" type="button">Vider le portefeuille</button>
+    </p>
+  </div>
+
+</main>
+
+<script>
+(function () {
+  var CLE = 'tayyib.portefeuille.v1';
+  var STANDARD = {{ standard.id | tojson }};
+  var LIBELLES = {conforme: 'Conforme', a_verifier: 'À vérifier', non_conforme: 'Non conforme'};
+
+  var univers = {}, lignes = charge();
+
+  var elValeur = document.getElementById('pf-valeur'),
+      elQte = document.getElementById('pf-qte'),
+      elLignes = document.getElementById('pf-lignes'),
+      elCompteurs = document.getElementById('pf-compteurs'),
+      elVide = document.getElementById('pf-vide'),
+      elResultats = document.getElementById('pf-resultats'),
+      elAlerte = document.getElementById('pf-alerte');
+
+  function charge() {
+    try { return JSON.parse(localStorage.getItem(CLE)) || []; }
+    catch (e) { return []; }
+  }
+
+  function sauve() {
+    try { localStorage.setItem(CLE, JSON.stringify(lignes)); }
+    catch (e) { /* navigation privée : on continue sans persistance */ }
+  }
+
+  function euros(v) {
+    return v.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+
+  fetch('/api/univers.json?standard=' + encodeURIComponent(STANDARD))
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      elValeur.innerHTML = '<option value="">Choisir une valeur…</option>';
+      data.valeurs.slice().sort(function (a, b) {
+        return a.nom.localeCompare(b.nom, 'fr');
+      }).forEach(function (v) {
+        univers[v.ticker] = v;
+        var o = document.createElement('option');
+        o.value = v.ticker;
+        o.textContent = v.nom + ' (' + v.ticker + ')';
+        elValeur.appendChild(o);
+      });
+      rend();
+    })
+    .catch(function () {
+      elValeur.innerHTML = '<option value="">Univers indisponible</option>';
+    });
+
+  function rend() {
+    // On ignore les lignes dont le ticker a disparu de l'univers plutôt que
+    // d'afficher une position fantôme sans prix ni verdict.
+    var actives = lignes.filter(function (l) { return univers[l.ticker]; });
+
+    if (!actives.length) {
+      elVide.hidden = false;
+      elResultats.hidden = true;
+      return;
+    }
+    elVide.hidden = true;
+    elResultats.hidden = false;
+
+    var total = 0, parVerdict = {conforme: 0, a_verifier: 0, non_conforme: 0};
+    actives.forEach(function (l) {
+      var v = univers[l.ticker];
+      // Valorisation en euros convertis, jamais en devise de cotation :
+      // additionner une ligne saoudienne et une ligne parisienne dans leurs
+      // devises respectives donnerait un total dénué de sens, et les parts
+      // de portefeuille qu'on en tire seraient fausses.
+      l.valeur = (v.prix_eur || 0) * l.qte;
+      total += l.valeur;
+      parVerdict[v.verdict] += l.valeur;
+    });
+
+    elCompteurs.innerHTML = '';
+    ajouteCompteur('tous', 'Valorisation totale', euros(total) + ' €');
+    ['conforme', 'a_verifier', 'non_conforme'].forEach(function (v) {
+      var part = total > 0 ? (parVerdict[v] / total * 100) : 0;
+      ajouteCompteur(v, LIBELLES[v], part.toFixed(1).replace('.', ',') + ' %');
+    });
+
+    elLignes.innerHTML = '';
+    actives.sort(function (a, b) { return b.valeur - a.valeur; }).forEach(function (l) {
+      var v = univers[l.ticker];
+      var tr = document.createElement('tr');
+
+      var td = document.createElement('td');
+      var a = document.createElement('a');
+      a.className = 'nom-valeur';
+      a.href = '/valeur/' + l.ticker + '?standard=' + encodeURIComponent(STANDARD);
+      a.textContent = v.nom;
+      td.appendChild(a);
+      var tk = document.createElement('div');
+      tk.className = 'ticker num';
+      tk.textContent = l.ticker + (v.devise && v.devise !== 'EUR' ? ' · coté en ' + v.devise : '');
+      td.appendChild(tk);
+      tr.appendChild(td);
+
+      var tdv = document.createElement('td');
+      var sp = document.createElement('span');
+      sp.className = 'verdict v-' + v.verdict;
+      sp.textContent = LIBELLES[v.verdict];
+      tdv.appendChild(sp);
+      tr.appendChild(tdv);
+
+      tr.appendChild(cellule(l.qte.toLocaleString('fr-FR'), 'a-droite num'));
+      tr.appendChild(cellule(euros(l.valeur) + ' €', 'a-droite num'));
+      tr.appendChild(cellule(total > 0 ? (l.valeur / total * 100).toFixed(1).replace('.', ',') + ' %' : '—', 'a-droite num'));
+
+      var tdx = document.createElement('td');
+      tdx.className = 'a-droite';
+      var b = document.createElement('button');
+      b.className = 'lien-bouton';
+      b.type = 'button';
+      b.textContent = 'Retirer';
+      b.addEventListener('click', function () {
+        lignes = lignes.filter(function (x) { return x.ticker !== l.ticker; });
+        sauve(); rend();
+      });
+      tdx.appendChild(b);
+      tr.appendChild(tdx);
+
+      elLignes.appendChild(tr);
+    });
+
+    var problemes = actives.filter(function (l) {
+      return univers[l.ticker].verdict !== 'conforme';
+    });
+    if (problemes.length) {
+      elAlerte.hidden = false;
+      elAlerte.innerHTML = '<p><strong>' + problemes.length + ' ligne' +
+        (problemes.length > 1 ? 's demandent' : ' demande') + ' votre attention.</strong> ' +
+        problemes.map(function (l) {
+          return univers[l.ticker].nom + ' — ' + LIBELLES[univers[l.ticker].verdict].toLowerCase();
+        }).join(' · ') + '</p><p>Ouvrez chaque fiche pour le motif détaillé. ' +
+        'Rappel : le filtre des 5 % de revenus non conformes n\'est calculable ' +
+        'depuis aucune source de marché et reste à votre charge, y compris sur ' +
+        'les lignes affichées conformes.</p>';
+    } else {
+      elAlerte.hidden = false;
+      elAlerte.innerHTML = '<p><strong>Toutes vos lignes passent les critères calculables.</strong> ' +
+        'Le filtre des 5 % de revenus non conformes reste à vérifier dans les ' +
+        'rapports annuels : il n\'est calculable depuis aucune source de marché.</p>';
+    }
+  }
+
+  function cellule(texte, classe) {
+    var td = document.createElement('td');
+    td.className = classe || '';
+    td.textContent = texte;
+    return td;
+  }
+
+  function ajouteCompteur(cle, libelle, valeur) {
+    var d = document.createElement('div');
+    d.className = 'compteur c-' + cle;
+    d.innerHTML = '<div class="compteur-nb num"></div><div class="compteur-lb"></div>';
+    d.querySelector('.compteur-nb').textContent = valeur;
+    d.querySelector('.compteur-lb').textContent = libelle;
+    elCompteurs.appendChild(d);
+  }
+
+  document.getElementById('pf-ajouter').addEventListener('click', function () {
+    var ticker = elValeur.value, qte = parseFloat(elQte.value);
+    if (!ticker || !qte || qte <= 0) return;
+
+    var existante = lignes.filter(function (l) { return l.ticker === ticker; })[0];
+    if (existante) { existante.qte += qte; }
+    else { lignes.push({ticker: ticker, qte: qte}); }
+
+    elQte.value = '';
+    elValeur.value = '';
+    sauve(); rend();
+  });
+
+  document.getElementById('pf-vider').addEventListener('click', function () {
+    if (!confirm('Vider entièrement le portefeuille ?')) return;
+    lignes = [];
+    sauve(); rend();
+  });
+})();
+</script>
+{% endblock %}

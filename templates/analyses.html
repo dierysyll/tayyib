@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+{% block titre %}Analyses{% endblock %}
+{% block description %}Ce que le screening halal révèle à l'échelle de l'univers : basculements de conformité, palmarès des valeurs conformes, taux de conformité par place, désaccords entre standards.{% endblock %}
+
+{% macro ligne_valeur(societe, rang, valeur_droite, meta) %}
+  <a class="lv-ligne" href="/valeur/{{ societe.ticker }}?standard={{ standard.id }}">
+    {% if rang %}<span class="lv-rang">{{ rang }}</span>{% endif %}
+    <span class="lv-corps">
+      <span class="lv-nom">{{ societe.nom }}</span>
+      <span class="lv-meta">{{ meta }}</span>
+    </span>
+    <span class="lv-val">{{ valeur_droite }}</span>
+  </a>
+{% endmacro %}
+
+{% block contenu %}
+<main class="page">
+
+  <h1 class="titre-page">Analyses</h1>
+  <p class="chapeau">
+    Un screener répond à « cette action est-elle conforme ? ». Ces pages répondent
+    aux questions que personne ne pose pour vous : qu'est-ce qui a changé, où sont
+    les valeurs conformes qui rapportent, et où les standards se contredisent.
+    Tout est calculé sur les {{ total }} valeurs de l'univers, selon
+    {{ standard.full }}.
+  </p>
+
+  <div class="outils">
+    <div class="segments">
+      {% for sid, std in standards.items() %}
+        <a href="?standard={{ sid }}" class="{% if sid == standard.id %}on{% endif %}">{{ std.label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# --- Les basculements : la vraie exclusivité de cette page ---------- #}
+  <h2 class="section">Ce qui a changé au dernier arrêté comptable</h2>
+  <div class="grille-analyses">
+
+    <section class="carte">
+      <div class="carte-tete">
+        <div>
+          <h3 class="carte-titre">Entrées en conformité</h3>
+          <p class="carte-sous">
+            {{ nb_entrees }} valeur{{ 's' if nb_entrees > 1 }} devenue{{ 's' if nb_entrees > 1 }}
+            conforme{{ 's' if nb_entrees > 1 }} entre les deux derniers exercices — le plus souvent
+            par désendettement.
+          </p>
+        </div>
+        <span class="carte-icone i-vert">↑</span>
+      </div>
+      <div class="carte-corps">
+        {% if entrees %}
+          <div class="liste-valeurs">
+            {% for m in entrees %}
+              {{ ligne_valeur(m.societe, none,
+                              m.societe.market_cap_eur | euros,
+                              m.annee_avant ~ ' → ' ~ m.annee_apres) }}
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="carte-vide">Aucun basculement vers la conformité sur cet univers.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="carte">
+      <div class="carte-tete">
+        <div>
+          <h3 class="carte-titre">Sorties de conformité</h3>
+          <p class="carte-sous">
+            {{ nb_sorties }} valeur{{ 's' if nb_sorties > 1 }} qui étai{{ 'en' if nb_sorties > 1 }}t
+            conforme{{ 's' if nb_sorties > 1 }} et ne l'{{ 'ont' if nb_sorties > 1 else 'a' }} plus été.
+            C'est le cas qui oblige à arbitrer.
+          </p>
+        </div>
+        <span class="carte-icone i-rouge">↓</span>
+      </div>
+      <div class="carte-corps">
+        {% if sorties %}
+          <div class="liste-valeurs">
+            {% for m in sorties %}
+              {{ ligne_valeur(m.societe, none,
+                              m.societe.market_cap_eur | euros,
+                              m.annee_avant ~ ' → ' ~ m.annee_apres) }}
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="carte-vide">Aucune sortie de conformité sur cet univers.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div class="encart">
+    <p><strong>Comment lire ces deux listes.</strong>
+    Chaque exercice est jugé sur ses propres chiffres — dette, trésorerie et créances
+    de l'arrêté, rapportées à la capitalisation reconstituée à cette date. En revanche,
+    le filtre sectoriel appliqué est celui d'aujourd'hui : un basculement signalé ici
+    vient donc toujours des ratios, jamais d'un changement d'activité.</p>
+  </div>
+
+  {# --- Palmarès -------------------------------------------------------- #}
+  <h2 class="section">Où chercher parmi les conformes</h2>
+  <div class="grille-analyses">
+
+    <section class="carte">
+      <div class="carte-tete">
+        <div>
+          <h3 class="carte-titre">Meilleurs rendements conformes</h3>
+          <p class="carte-sous">Dividende rapporté au cours. Réservé aux valeurs conformes : classer des valeurs exclues par leur rendement serait une invitation contradictoire.</p>
+        </div>
+        <span class="carte-icone i-vert">%</span>
+      </div>
+      <div class="carte-corps">
+        {% if rendements %}
+          <div class="liste-valeurs">
+            {% for c in rendements %}
+              {{ ligne_valeur(c.societe, loop.index,
+                              (c.rendement * 100) | round(1) | string | replace('.', ',') ~ ' %',
+                              c.societe.industry or c.societe.sector or '—') }}
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="carte-vide">Aucune valeur conforme versant un dividende.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="carte">
+      <div class="carte-tete">
+        <div>
+          <h3 class="carte-titre">Plus grosses capitalisations conformes</h3>
+          <p class="carte-sous">Converties en euros, donc comparables d'une place à l'autre.</p>
+        </div>
+        <span class="carte-icone i-europe">€</span>
+      </div>
+      <div class="carte-corps">
+        {% if tailles %}
+          <div class="liste-valeurs">
+            {% for e in tailles %}
+              {{ ligne_valeur(e.societe, loop.index,
+                              e.societe.market_cap_eur | euros,
+                              e.societe.industry or e.societe.sector or '—') }}
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="carte-vide">Aucune valeur conforme dans l'univers collecté.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  {# --- Désaccords entre standards -------------------------------------- #}
+  <h2 class="section">Là où les standards se contredisent</h2>
+  <section class="carte">
+    <div class="carte-tete">
+      <div>
+        <h3 class="carte-titre">Conforme selon l'un, exclue selon l'autre</h3>
+        <p class="carte-sous">
+          Même société, même jour, verdicts opposés. C'est la démonstration la plus
+          concrète que « halal » n'est pas une propriété de l'entreprise mais le
+          résultat d'une convention de calcul : l'AAOIFI rapporte la dette à la
+          capitalisation boursière, MSCI au total du bilan.
+        </p>
+      </div>
+      <span class="carte-icone i-ambre">⚖</span>
+    </div>
+    <div class="carte-corps">
+      {% if desaccords %}
+        <div class="defilement">
+          <table>
+            <thead>
+              <tr>
+                <th>Valeur</th>
+                {% for sid, std in standards.items() %}<th>{{ std.label }}</th>{% endfor %}
+                <th class="a-droite">Capitalisation</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for d in desaccords %}
+                <tr>
+                  <td>
+                    <a class="nom-valeur" href="/valeur/{{ d.societe.ticker }}?standard={{ standard.id }}">{{ d.societe.nom }}</a>
+                    <div class="ticker">{{ d.societe.ticker }}</div>
+                  </td>
+                  {% for sid in standards %}
+                    <td><span class="verdict v-{{ d.verdicts[sid] }}">{{ engine.VERDICT_LABELS[d.verdicts[sid]] }}</span></td>
+                  {% endfor %}
+                  <td class="a-droite">{{ d.societe.market_cap_eur | euros }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="carte-vide">Aucun désaccord tranché entre les trois standards.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  {# --- Répartition par standard ---------------------------------------- #}
+  <h2 class="section">Ce que change le choix du standard</h2>
+  <div class="grille-analyses">
+    {% for r in repartitions %}
+      <section class="carte">
+        <div class="carte-tete">
+          <div>
+            <h3 class="carte-titre">{{ r.standard.label }}</h3>
+            <p class="carte-sous">Rapporté à la {{ r.standard.denominator_label }}.</p>
+          </div>
+          <span class="carte-icone {% if r.standard.id == standard.id %}i-vert{% else %}i-europe{% endif %}">
+            {{ (r.part.conforme * 100) | round | int }}%
+          </span>
+        </div>
+        <div class="carte-corps" style="padding:16px 20px 18px">
+          <div class="repartition">
+            <span class="rep-part rep-conforme" style="width:{{ r.part.conforme * 100 }}%"></span>
+            <span class="rep-part rep-a_verifier" style="width:{{ r.part.a_verifier * 100 }}%"></span>
+            <span class="rep-part rep-non_conforme" style="width:{{ r.part.non_conforme * 100 }}%"></span>
+          </div>
+          <div class="rep-legende">
+            <span class="leg leg-conforme">{{ r.compte.conforme }} conformes</span>
+            <span class="leg leg-a_verifier">{{ r.compte.a_verifier }} à vérifier</span>
+            <span class="leg leg-non_conforme">{{ r.compte.non_conforme }} exclues</span>
+          </div>
+        </div>
+      </section>
+    {% endfor %}
+  </div>
+
+  {# --- Par place ------------------------------------------------------- #}
+  <h2 class="section">Taux de conformité par place</h2>
+  <section class="carte">
+    <div class="carte-tete">
+      <div>
+        <h3 class="carte-titre">Où le monde est-il investissable ?</h3>
+        <p class="carte-sous">
+          À lire avec précaution : un taux bas peut refléter la structure d'une
+          économie — Francfort et Zurich comptent beaucoup de banques — autant
+          qu'une lacune de nos données. Au Caire et à Karachi, Yahoo ne renseigne
+          pas le secteur d'activité, et tout y tombe donc en « à vérifier ».
+        </p>
+      </div>
+      <span class="carte-icone i-musulman">🌍</span>
+    </div>
+    <div class="carte-corps">
+      <div class="defilement">
+        <table>
+          <thead>
+            <tr>
+              <th>Place</th>
+              <th class="a-droite">Valeurs</th>
+              <th class="a-droite">Conformes</th>
+              <th class="a-droite">À vérifier</th>
+              <th class="a-droite">Exclues</th>
+              <th class="a-droite">Taux</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in places %}
+              <tr>
+                <td>
+                  <a class="nom-valeur" href="/?standard={{ standard.id }}&amp;region={{ p.place.region }}&amp;place={{ p.place.id }}">
+                    <span class="drapeau">{{ p.place.drapeau }}</span> {{ p.place.nom }}
+                  </a>
+                  <div class="ticker">{{ p.place.indice }}</div>
+                </td>
+                <td class="a-droite">{{ p.total }}</td>
+                <td class="a-droite" style="color:var(--vert);font-weight:600">{{ p.conforme }}</td>
+                <td class="a-droite">{{ p.a_verifier }}</td>
+                <td class="a-droite">{{ p.non_conforme }}</td>
+                <td class="a-droite" style="font-weight:660">{{ (p.part_conforme * 100) | round | int }} %</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  {# --- Secteurs -------------------------------------------------------- #}
+  <h2 class="section">Les secteurs qui offrent le plus de conformes</h2>
+  <section class="carte">
+    <div class="carte-corps">
+      <div class="liste-valeurs">
+        {% for s in secteurs %}
+          <a class="lv-ligne" href="/?standard={{ standard.id }}&amp;secteur={{ s.secteur | urlencode }}&amp;verdict=conforme">
+            <span class="lv-rang">{{ loop.index }}</span>
+            <span class="lv-corps">
+              <span class="lv-nom">{{ s.secteur }}</span>
+              <span class="lv-meta">{{ s.conformes }} conformes sur {{ s.total }} valeurs suivies</span>
+            </span>
+            <span class="lv-val">{{ (s.part * 100) | round | int }} %</span>
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  {% if fetched_at %}
+    <p class="pied-liens" style="margin-top:22px">Calculé sur les données collectées le {{ fetched_at | date_fr }}.</p>
+  {% endif %}
+
+</main>
+{% endblock %}

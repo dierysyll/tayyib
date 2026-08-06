@@ -8,17 +8,72 @@
 
   <div class="fiche-tete">
     <div>
+      {% if place %}
+        <p class="place-tag" style="margin:0 0 8px">
+          <span class="place-pip p-{{ place.region }}"></span>
+          <span class="drapeau">{{ place.drapeau }}</span>
+          {{ place.nom }} · {{ place.indice }}
+        </p>
+      {% endif %}
       <h1 class="fiche-titre">{{ societe.nom }}</h1>
       <p class="fiche-sous num">
         {{ societe.ticker }}
         {%- if societe.industry %} · {{ societe.industry }}{% endif %}
-        {%- if societe.market_cap %} · {{ societe.market_cap | montant }} {{ societe.currency or '' }}{% endif %}
+        {%- if societe.market_cap %} · {{ societe.market_cap | montant }} {{ societe.currency or '' }}
+          {%- if societe.market_cap_eur and societe.currency != 'EUR' %}
+            <span style="color:var(--texte-faible)">({{ societe.market_cap_eur | euros }})</span>
+          {%- endif %}
+        {%- endif %}
       </p>
     </div>
-    <span class="verdict v-{{ resultat.verdict }}">{{ engine.VERDICT_LABELS[resultat.verdict] }} — {{ standard.label }}</span>
+    <div class="fiche-cours">
+      {% if societe.prix %}
+        <div class="cours-prix num">{{ societe.prix | nombre }} {{ societe.currency or '' }}</div>
+      {% endif %}
+      <span class="verdict v-{{ resultat.verdict }}">{{ engine.VERDICT_LABELS[resultat.verdict] }} — {{ standard.label }}</span>
+    </div>
   </div>
 
   <div class="motif m-{{ resultat.verdict }}">{{ resultat.raison }}</div>
+
+  {# --- Cours et conformité, sur le même axe ------------------------- #}
+  {% if graphique %}
+    <h2 class="section">
+      Cours sur 5 ans
+      <span class="section-note num {{ 'hausse' if graphique.variation >= 0 else 'baisse' }}">{{ graphique.variation | signe }}</span>
+    </h2>
+    <div class="cadre graphique">
+      <svg viewBox="0 0 {{ graphique.largeur }} {{ graphique.hauteur }}" preserveAspectRatio="none" class="courbe" role="img"
+           aria-label="Cours de {{ societe.nom }} sur cinq ans, avec le verdict de conformité à chaque arrêté comptable">
+        <defs>
+          <linearGradient id="degrade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" class="deg-haut"/>
+            <stop offset="100%" class="deg-bas"/>
+          </linearGradient>
+        </defs>
+        <path d="{{ graphique.aire }}" fill="url(#degrade)"/>
+        <path d="{{ graphique.ligne }}" class="trait" fill="none" vector-effect="non-scaling-stroke"/>
+        {% for r in graphique.reperes %}
+          <line x1="{{ r.x }}" y1="{{ r.y }}" x2="{{ r.x }}" y2="{{ graphique.base_y }}"
+                class="repere-tige rv-{{ r.verdict }}" vector-effect="non-scaling-stroke"/>
+          <circle cx="{{ r.x }}" cy="{{ r.y }}" r="4.5" class="repere rv-{{ r.verdict }}"
+                  vector-effect="non-scaling-stroke"/>
+        {% endfor %}
+      </svg>
+      <div class="graphique-axe num">
+        <span>{{ graphique.bas | nombre }}</span>
+        <span class="graphique-legende">
+          {% for r in graphique.reperes %}<span class="leg leg-{{ r.verdict }}">{{ r.annee }}</span>{% endfor %}
+        </span>
+        <span>{{ graphique.haut | nombre }}</span>
+      </div>
+      <p class="graphique-note">
+        Les points marquent chaque arrêté comptable, coloriés selon le verdict
+        {{ standard.label }} de l'exercice. C'est la même donnée que le tableau
+        ci-dessous, lue sur l'axe du cours.
+      </p>
+    </div>
+  {% endif %}
 
   {% if resultat.ratios %}
     <h2 class="section">Ratios financiers — {{ standard.full }}</h2>
@@ -59,8 +114,110 @@
     {% endif %}
   {% endif %}
 
-  {# Inutile de répéter le motif sectoriel quand c'est lui qui a produit le
-     verdict affiché en tête de page. #}
+  {# --- Historique de conformité ------------------------------------- #}
+  {% if historique | length > 1 %}
+    <h2 class="section">Conformité, exercice par exercice</h2>
+    <div class="cadre defilement">
+      <table>
+        <thead>
+          <tr>
+            <th>Exercice</th>
+            <th>Verdict {{ standard.label }}</th>
+            {% for r in historique[0].ratios %}<th class="a-droite">{{ r.label }}</th>{% endfor %}
+            <th class="a-droite">{{ 'Total bilan' if standard.denominator == 'total_assets' else 'Capitalisation' }}</th>
+            <th class="a-droite">Chiffre d'affaires</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in historique %}
+            <tr>
+              <td class="num">{{ h.date | date_fr }}</td>
+              <td><span class="verdict v-{{ h.verdict }}">{{ engine.VERDICT_LABELS[h.verdict] }}</span></td>
+              {% for r in h.ratios %}
+                <td class="a-droite num {{ 'depasse' if r.statut == 'depasse' }}">{{ r.valeur | pourcent }}</td>
+              {% endfor %}
+              {% if not h.ratios %}<td colspan="{{ historique[0].ratios | length }}" class="secteur">—</td>{% endif %}
+              <td class="a-droite num">{{ (h.market_cap if standard.denominator == 'market_cap' else none) | montant if standard.denominator == 'market_cap' else '—' }}</td>
+              <td class="a-droite num">{{ h.revenu | montant }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="comp-note" style="margin-top:10px; max-width:68ch">
+      Chaque exercice est jugé sur ses propres chiffres. La capitalisation
+      passée est reconstituée à partir du cours de clôture de l'arrêté et du
+      nombre d'actions du même bilan — pas de la capitalisation d'aujourd'hui.
+      <strong>En revanche le filtre sectoriel appliqué est celui d'aujourd'hui</strong> :
+      Yahoo ne publie pas l'activité historique d'une société.
+    </p>
+  {% endif %}
+
+  {# --- Valorisation -------------------------------------------------- #}
+  {% set v = societe.valorisation or {} %}
+  {% if v.per or v.price_to_book or v.ev_ebitda %}
+    <h2 class="section">Valorisation</h2>
+    <div class="chiffres">
+      {% for lb, val, suffixe in [
+          ('PER', v.per, ''), ('PER estimé', v.per_estime, ''),
+          ('Cours / actif net', v.price_to_book, ''), ('VE / EBITDA', v.ev_ebitda, ''),
+          ('Bêta', v.beta, ''), ('Marge nette', v.marge_nette, '%'),
+          ('Rentabilité des fonds propres', v.roe, '%'),
+          ('Rendement du dividende', societe.rendement, '%')
+      ] %}
+        <div class="chiffre">
+          <div class="chiffre-lb">{{ lb }}</div>
+          <div class="chiffre-val num">
+            {% if val is none %}—
+            {% elif suffixe == '%' %}{{ (val if val > 1 else val * 100) | nombre(1) }} %
+            {% else %}{{ val | nombre(1) }}{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+      {% if v.plus_bas_52s and v.plus_haut_52s %}
+        <div class="chiffre">
+          <div class="chiffre-lb">Extrêmes sur 52 semaines</div>
+          <div class="chiffre-val num">{{ v.plus_bas_52s | nombre }} – {{ v.plus_haut_52s | nombre }}</div>
+        </div>
+      {% endif %}
+    </div>
+    <p class="comp-note" style="margin-top:10px">
+      Ces multiples ne participent pas au screening : la conformité ne dit rien
+      du prix payé. Une valeur peut être parfaitement conforme et chèrement
+      valorisée.
+    </p>
+  {% endif %}
+
+  {# --- Comptes annuels ---------------------------------------------- #}
+  {% set avec_comptes = historique | selectattr('revenu') | list %}
+  {% if avec_comptes | length > 1 %}
+    <h2 class="section">Comptes annuels</h2>
+    <div class="cadre defilement">
+      <table>
+        <thead>
+          <tr>
+            <th>Exercice</th>
+            <th class="a-droite">Chiffre d'affaires</th>
+            <th class="a-droite">Résultat net</th>
+            <th class="a-droite">Marge nette</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in avec_comptes %}
+            <tr>
+              <td class="num">{{ h.date | date_fr }}</td>
+              <td class="a-droite num">{{ h.revenu | montant }}</td>
+              <td class="a-droite num">{{ h.resultat_net | montant }}</td>
+              <td class="a-droite num">
+                {{ (h.resultat_net / h.revenu) | pourcent if h.resultat_net and h.revenu else '—' }}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
   {% if resultat.sector_reason and resultat.sector_reason != resultat.raison %}
     <h2 class="section">Filtre sectoriel</h2>
     <div class="motif m-{{ 'non_conforme' if resultat.sector_verdict == 'exclu' else 'a_verifier' }}">
@@ -82,7 +239,7 @@
     <div class="calc">
       <div class="calc-champs">
         <div class="champ">
-          <label for="div">Dividendes perçus (€)</label>
+          <label for="div">Dividendes perçus ({{ societe.currency or '€' }})</label>
           <input type="number" id="div" min="0" step="0.01" value="{{ '%.2f' | format(societe.dividende_par_action) if societe.dividende_par_action else '' }}" placeholder="0,00">
         </div>
         <div class="champ">
@@ -91,7 +248,7 @@
         </div>
         <div class="calc-sortie">
           <div class="cs-lb">Montant à purifier</div>
-          <div class="cs-val" id="sortie">—</div>
+          <div class="cs-val num" id="sortie">—</div>
         </div>
       </div>
       <p class="comp-note">
@@ -99,6 +256,20 @@
         {% if societe.dividende_par_action %}Le champ dividende est prérempli avec le dividende annuel par action ({{ '%.2f' | format(societe.dividende_par_action) }} {{ societe.currency or '' }}) : remplacez-le par le total que vous avez réellement perçu.{% endif %}
       </p>
     </div>
+
+    {% if societe.dividendes | length > 1 %}
+      <h3 class="sous-section">Dividendes versés</h3>
+      <div class="cadre defilement">
+        <table>
+          <thead><tr><th>Date de détachement</th><th class="a-droite">Montant par action</th></tr></thead>
+          <tbody>
+            {% for d, m in societe.dividendes | reverse %}
+              <tr><td class="num">{{ d | date_fr }}</td><td class="a-droite num">{{ m | nombre }} {{ societe.currency or '' }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
   {% endif %}
 
   <h2 class="section">Le même titre selon les trois standards</h2>
@@ -135,7 +306,7 @@
     function calcule() {
       var d = parseFloat(div.value), p = parseFloat(part.value);
       if (isNaN(d) || isNaN(p)) { sortie.textContent = '—'; return; }
-      sortie.textContent = (d * p / 100).toFixed(2).replace('.', ',') + ' €';
+      sortie.textContent = (d * p / 100).toFixed(2).replace('.', ',') + ' {{ societe.currency or "€" }}';
     }
     div.addEventListener('input', calcule);
     part.addEventListener('input', calcule);

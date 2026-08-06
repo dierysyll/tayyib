@@ -1,52 +1,266 @@
 """
 Rafraîchit le cache de l'univers.
 
-    python refresh.py
+    python refresh.py                  collecte complète (taux, valeurs, actus)
+    python refresh.py --force          ignore la reprise, tout redemander
+    python refresh.py --places paris,riyad    seulement ces places
+    python refresh.py --actus          seulement le fil d'actualité
+    python refresh.py --index          réécrit l'index depuis le disque
 
-À lancer à la main, ou par une tâche planifiée quotidienne. Yahoo limite
-le débit : on espace les appels et on garde la valeur déjà en cache quand
-un ticker échoue, plutôt que de perdre une société sur un 429 passager.
+À lancer à la main, ou par une tâche planifiée quotidienne.
+
+Trois précautions, toutes dictées par la même contrainte : Yahoo limite le
+débit, et une collecte de plus de mille valeurs le déclenche à coup sûr si
+on s'y prend mal.
+
+  1. **Parallélisme mesuré.** Quatre requêtes simultanées passent ;
+     au-delà, on récolte des HTTP 429 en rafale. Ce n'est pas la peine
+     d'aller plus vite pour se faire bloquer à mi-parcours.
+
+  2. **Reprise.** Un symbole dont le détail est déjà sur disque et daté de
+     moins de `FRAICHEUR` heures n'est pas redemandé. Une collecte
+     interrompue se relance sans repartir de zéro — et sans repasser une
+     heure sur des données qu'on a déjà.
+
+  3. **Index écrit en cours de route.** Toutes les `PALIER` valeurs, l'index
+     est réécrit. Le site sert donc un univers qui grandit pendant la
+     collecte, au lieu d'attendre la fin pour tout basculer d'un coup.
+
+Une valeur qui échoue conserve sa version en cache : on ne perd pas une
+société sur un 429 passager.
 """
 
+import argparse
+import concurrent.futures as cf
+import random
 import sys
+import threading
 import time
 
-from data import cache, universe, yahoo
+from data import cache, fx, universe, yahoo
 
-PAUSE = 0.4  # secondes entre deux tickers, pour rester sous le radar de Yahoo
+TRAVAILLEURS = 3      # requêtes simultanées vers Yahoo
+PAUSE = 0.35          # secondes entre deux départs, par travailleur
+FRAICHEUR = 20 * 3600  # au-delà, une valeur en cache est considérée périmée
+PALIER = 40           # écriture de l'index toutes les N valeurs
+RETENTES = 4          # tentatives en cas de blocage
+
+# Attente après un blocage, en secondes. Yahoo ne débloque pas en trois
+# secondes : la première version de ce fichier réessayait beaucoup trop
+# vite, épuisait ses tentatives et concluait à tort que le symbole
+# n'existait pas. Comme tous les travailleurs se font bloquer ensemble,
+# ces pauses jouent de fait le rôle d'un refroidissement global.
+ATTENTES = [45, 120, 300]
+
+# Les actualités sont collectées sur les plus grosses valeurs seulement :
+# un fil de mille titres n'est pas un fil, et chaque appel est une requête
+# de plus vers une source qui nous limite déjà.
+ACTUS_VALEURS = 60
+
+_verrou = threading.Lock()
+
+
+def _collecte_une(ticker):
+    """Une société, avec longues retentes en cas de blocage.
+
+    Renvoie (societe, erreur). `societe` à None avec `erreur` à None
+    signifie que Yahoo ne connaît pas le symbole — c'est le seul cas où
+    l'on peut conclure à une absence réelle.
+    """
+    for tentative in range(RETENTES):
+        try:
+            return yahoo.fetch(ticker), None
+        except yahoo.SourceIndisponible:
+            if tentative == RETENTES - 1:
+                return None, "bloqué par Yahoo (à relancer)"
+            # Attente longue et bruitée : si tous les travailleurs
+            # repartent en même temps, on se refait bloquer aussitôt.
+            time.sleep(ATTENTES[tentative] + random.uniform(0, 8))
+        except Exception as exc:
+            return None, str(exc)[:60]
+    return None, "bloqué par Yahoo (à relancer)"
+
+
+def _places_demandees(arg):
+    if not arg:
+        return list(universe.PLACES)
+    demandees = [p.strip() for p in arg.split(",") if p.strip()]
+    inconnues = [p for p in demandees if p not in universe.PLACES]
+    if inconnues:
+        print(f"Places inconnues : {', '.join(inconnues)}")
+        print(f"Places disponibles : {', '.join(universe.PLACES)}")
+        sys.exit(2)
+    return demandees
+
+
+def collecte_valeurs(places, force=False):
+    """Collecte les sociétés des places demandées. Renvoie (collectées, échecs)."""
+    index_place = universe.place_par_ticker()
+    a_faire = []
+    vus = set()
+    for place_id in places:
+        for ticker in universe.PLACES[place_id]["valeurs"]:
+            if ticker not in vus:
+                vus.add(ticker)
+                a_faire.append(ticker)
+
+    connus = cache.deja_collectes()
+    maintenant = time.time()
+    if not force:
+        frais = [t for t in a_faire
+                 if t in connus and maintenant - connus[t] < FRAICHEUR]
+        a_faire = [t for t in a_faire if t not in set(frais)]
+        if frais:
+            print(f"{len(frais)} valeurs déjà fraîches, ignorées (--force pour les redemander)")
+
+    print(f"{len(a_faire)} valeurs à collecter sur {len(places)} places\n")
+    if not a_faire:
+        return 0, []
+
+    taux = fx.collecte(universe.devises())
+    print(f"Taux de change : {len(taux)} devises ({', '.join(sorted(taux))})\n")
+
+    # Deux registres d'échec, parce qu'ils appellent deux actions
+    # différentes : `bloques` se relance, `inconnus` se corrige.
+    faits, bloques, inconnus = [0], [], []
+
+    def traiter(i_ticker):
+        i, ticker = i_ticker
+        # Départs échelonnés : quatre travailleurs qui partent ensemble
+        # sur le premier lot suffisent à déclencher la limitation.
+        time.sleep(PAUSE * (i % TRAVAILLEURS))
+        societe, erreur = _collecte_une(ticker)
+
+        with _verrou:
+            faits[0] += 1
+            n = faits[0]
+
+        if societe:
+            societe["place"] = index_place.get(ticker)
+            societe["market_cap_eur"] = fx.en_euros(
+                societe.get("market_cap"), societe.get("currency"), taux
+            )
+            cache.save_detail(societe)
+            etat = f"{(societe['nom'] or '')[:32]:34} {societe.get('sector') or '—'}"
+        elif erreur:
+            bloques.append(ticker)
+            etat = f"ÉCHEC — {erreur}"
+        else:
+            # Yahoo a répondu et ne connaît pas ce symbole : c'est une
+            # absence réelle, pas un incident. Elle mérite d'être corrigée
+            # dans data/universe.py plutôt que réessayée indéfiniment.
+            inconnus.append(ticker)
+            etat = "inconnu de Yahoo — symbole à corriger"
+
+        print(f"[{n:4}/{len(a_faire)}] {ticker:14} {etat}", flush=True)
+
+        # Réécriture périodique : le site profite de la collecte en cours.
+        if n % PALIER == 0:
+            with _verrou:
+                _ecrire_index(taux)
+
+    with cf.ThreadPoolExecutor(max_workers=TRAVAILLEURS) as ex:
+        list(ex.map(traiter, enumerate(a_faire)))
+
+    _ecrire_index(taux)
+    return len(a_faire) - len(bloques) - len(inconnus), bloques, inconnus
+
+
+def _ecrire_index(taux, avec_metaux=False):
+    """Réécrit l'index à partir de tous les détails présents sur disque.
+
+    Les cours de l'or et de l'argent ne sont demandés qu'en fin de
+    collecte : ils servent au nissab de la zakat, et deux requêtes de plus
+    à chaque palier n'apporteraient rien.
+    """
+    societes = cache.charger_details(universe.tickers())
+    cache.save_index(societes, taux, fx.metaux(taux) if avec_metaux else None)
+    return len(societes)
+
+
+def collecte_actus():
+    """Le fil d'actualité, sur les plus grosses valeurs de l'univers."""
+    valeurs, _, _ = cache.index()
+    classees = sorted(
+        [v for v in valeurs if v.get("market_cap_eur")],
+        key=lambda v: -v["market_cap_eur"],
+    )[:ACTUS_VALEURS]
+
+    if not classees:
+        print("Index vide : collectez d'abord les valeurs.")
+        return []
+
+    print(f"Actualités sur les {len(classees)} plus grosses valeurs\n")
+    noms = {v["ticker"]: v["nom"] for v in classees}
+    articles = []
+
+    def traiter(i_valeur):
+        i, valeur = i_valeur
+        time.sleep(PAUSE * (i % TRAVAILLEURS))
+        lot = yahoo.fetch_news(valeur["ticker"])
+        for article in lot:
+            article["valeur"] = noms.get(article["ticker"])
+            article["place"] = valeur.get("place")
+        with _verrou:
+            articles.extend(lot)
+            print(f"[{len(articles):4}] {valeur['ticker']:14} {len(lot)} article(s)", flush=True)
+
+    with cf.ThreadPoolExecutor(max_workers=TRAVAILLEURS) as ex:
+        list(ex.map(traiter, enumerate(classees)))
+
+    # Dédoublonnage sur le lien : un même article est attaché à plusieurs
+    # sociétés dès qu'il parle d'un secteur.
+    uniques, vus = [], set()
+    for article in sorted(articles, key=lambda a: a.get("publie") or "", reverse=True):
+        if article["lien"] not in vus:
+            vus.add(article["lien"])
+            uniques.append(article)
+
+    cache.save_actus(uniques)
+    print(f"\n{len(uniques)} articles distincts écrits")
+    return uniques
 
 
 def main():
-    anciennes = {c["ticker"]: c for c in cache.load()[0]}
-    societes, echecs = [], []
+    parseur = argparse.ArgumentParser(description=__doc__)
+    parseur.add_argument("--force", action="store_true",
+                         help="redemande même les valeurs déjà fraîches")
+    parseur.add_argument("--places", default="",
+                         help="places à collecter, séparées par des virgules")
+    parseur.add_argument("--actus", action="store_true",
+                         help="collecte seulement le fil d'actualité")
+    parseur.add_argument("--index", action="store_true",
+                         help="réécrit seulement l'index depuis le disque")
+    args = parseur.parse_args()
 
-    for i, ticker in enumerate(universe.UNIVERSE, 1):
-        try:
-            societe = yahoo.fetch(ticker)
-        except Exception as e:
-            societe, erreur = None, str(e)[:60]
-        else:
-            erreur = "inconnu de Yahoo"
+    if args.index:
+        taux = fx.collecte(universe.devises())
+        print(f"{_ecrire_index(taux, avec_metaux=True)} valeurs réécrites dans l'index")
+        return 0
 
-        if societe:
-            societes.append(societe)
-            etat = f"{societe['nom'][:34]:36} {societe.get('sector') or '—'}"
-        elif ticker in anciennes:
-            societes.append(anciennes[ticker])
-            echecs.append(ticker)
-            etat = f"échec ({erreur}) — on garde la version en cache"
-        else:
-            echecs.append(ticker)
-            etat = f"échec ({erreur}) — aucune version en cache"
+    if args.actus:
+        return 0 if collecte_actus() else 1
 
-        print(f"[{i:2}/{len(universe.UNIVERSE)}] {ticker:10} {etat}")
-        time.sleep(PAUSE)
+    debut = time.time()
+    reussies, bloques, inconnus = collecte_valeurs(
+        _places_demandees(args.places), args.force
+    )
+    total = _ecrire_index(fx.collecte(universe.devises()), avec_metaux=True)
 
-    chemin = cache.save(societes)
-    print(f"\n{len(societes)} sociétés écrites dans {chemin}")
-    if echecs:
-        print(f"{len(echecs)} en échec : {', '.join(echecs)}")
-    return 0 if societes else 1
+    duree = time.time() - debut
+    print(f"\n{reussies} valeurs collectées en {duree / 60:.1f} min")
+    print(f"{total} valeurs au total dans l'index")
+    if bloques:
+        print(f"\n{len(bloques)} bloquées par Yahoo — relancez `python refresh.py` "
+              f"pour les reprendre :\n  {', '.join(bloques[:40])}"
+              + (" …" if len(bloques) > 40 else ""))
+    if inconnus:
+        print(f"\n{len(inconnus)} symboles inconnus de Yahoo — à corriger dans "
+              f"data/universe.py :\n  {', '.join(inconnus[:60])}"
+              + (" …" if len(inconnus) > 60 else ""))
+
+    collecte_actus()
+    return 0 if total else 1
 
 
 if __name__ == "__main__":

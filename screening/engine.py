@@ -45,8 +45,53 @@ def _ratio(numerateur, denominateur):
     return numerateur / denominateur
 
 
+def _denominateur(source, std):
+    """Le dénominateur exigé par le standard, lu dans un jeu de données —
+    société courante ou exercice passé, la structure est la même."""
+    if std["denominator"] == "market_cap":
+        return source.get("market_cap")
+    return source.get("total_assets")
+
+
+def _calcul_ratios(source, std):
+    """Applique les ratios du standard à un jeu de données daté.
+
+    Renvoie (ratios, depassement, manquants).
+    """
+    denominateur = _denominateur(source, std)
+    numerateurs = {
+        "debt": source.get("total_debt"),
+        "liquidity": source.get("cash_and_investments"),
+        "receivables": source.get("receivables"),
+    }
+
+    ratios, depassement, manquants = [], False, []
+    for cle, seuil in std["ratios"].items():
+        valeur = _ratio(numerateurs.get(cle), denominateur)
+
+        if valeur is None:
+            manquants.append(standards.RATIO_LABELS[cle])
+            statut = "inconnu"
+        elif valeur > seuil:
+            statut = "depasse"
+            depassement = True
+        else:
+            statut = "ok"
+
+        ratios.append({
+            "cle": cle,
+            "label": standards.RATIO_LABELS[cle],
+            "valeur": valeur,
+            "seuil": seuil,
+            "statut": statut,
+            "montant": numerateurs.get(cle),
+        })
+
+    return ratios, depassement, manquants
+
+
 def evaluate(company, standard_id=standards.DEFAULT_STANDARD):
-    """Évalue une société selon un standard.
+    """Évalue une société selon un standard, sur son dernier exercice.
 
     `company` est le dictionnaire produit par data/yahoo.py.
     Renvoie un dictionnaire de résultat, prêt pour l'affichage.
@@ -78,59 +123,29 @@ def evaluate(company, standard_id=standards.DEFAULT_STANDARD):
         return resultat
 
     # --- 2. Ratios financiers ------------------------------------------
-    denominateur = (
-        company.get("market_cap")
-        if std["denominator"] == "market_cap"
-        else company.get("total_assets")
-    )
-
-    numerateurs = {
-        "debt": company.get("total_debt"),
-        "liquidity": company.get("cash_and_investments"),
-        "receivables": company.get("receivables"),
-    }
-
-    depassement = False
-    for cle, seuil in std["ratios"].items():
-        valeur = _ratio(numerateurs.get(cle), denominateur)
-
-        if valeur is None:
-            resultat["donnees_manquantes"].append(standards.RATIO_LABELS[cle])
-            statut = "inconnu"
-        elif valeur > seuil:
-            statut = "depasse"
-            depassement = True
-        else:
-            statut = "ok"
-
-        resultat["ratios"].append({
-            "cle": cle,
-            "label": standards.RATIO_LABELS[cle],
-            "valeur": valeur,
-            "seuil": seuil,
-            "statut": statut,
-            "montant": numerateurs.get(cle),
-        })
+    ratios, depassement, manquants = _calcul_ratios(company, std)
+    resultat["ratios"] = ratios
+    resultat["donnees_manquantes"] = manquants
 
     # --- 3. Verdict ------------------------------------------------------
     if depassement:
-        depasses = [r["label"].lower() for r in resultat["ratios"] if r["statut"] == "depasse"]
+        depasses = [r["label"].lower() for r in ratios if r["statut"] == "depasse"]
         resultat["verdict"] = NON_CONFORME
         resultat["raison"] = (
             f"Seuil dépassé — {', '.join(depasses)} "
             f"(rapporté à la {std['denominator_label']})."
         )
-    elif not denominateur:
+    elif not _denominateur(company, std):
         resultat["verdict"] = A_VERIFIER
         resultat["raison"] = (
             f"La {std['denominator_label']} est indisponible : aucun ratio "
             "n'a pu être calculé."
         )
-    elif resultat["donnees_manquantes"]:
+    elif manquants:
         resultat["verdict"] = A_VERIFIER
         resultat["raison"] = (
             "Donnée absente du bilan publié — "
-            f"{', '.join(resultat['donnees_manquantes']).lower()}."
+            f"{', '.join(manquants).lower()}."
         )
     elif sector_verdict == sectors.A_VERIFIER:
         resultat["verdict"] = A_VERIFIER
@@ -146,6 +161,63 @@ def evaluate(company, standard_id=standards.DEFAULT_STANDARD):
     resultat["revenue_filter_pending"] = resultat["verdict"] != NON_CONFORME
 
     return resultat
+
+
+def historique_conformite(company, standard_id=standards.DEFAULT_STANDARD):
+    """Le verdict, exercice par exercice.
+
+    Chaque exercice est jugé sur SES propres chiffres : dette, trésorerie
+    et créances de l'arrêté, rapportées soit au total de bilan de l'arrêté,
+    soit à la capitalisation reconstituée à cette date (cours de clôture ×
+    nombre d'actions du même bilan — voir data/yahoo.py).
+
+    Une limite, assumée et affichée : le **filtre sectoriel appliqué est
+    celui d'aujourd'hui**. Yahoo ne publie pas l'activité historique d'une
+    société, et une entreprise qui a cédé sa branche bancaire il y a trois
+    ans apparaîtra donc exclue sur toute la période. C'est le sens
+    conservateur, mais il faut le savoir pour lire la série.
+
+    Renvoie la liste des exercices, du plus récent au plus ancien.
+    """
+    std = standards.get(standard_id)
+    sector_verdict, sector_reason = sectors.screen(
+        company.get("sector"), company.get("industry")
+    )
+
+    serie = []
+    for periode in company.get("historique", []):
+        entree = {
+            "date": periode["date"],
+            "annee": periode["date"][:4],
+            "market_cap": periode.get("market_cap"),
+            "cours": periode.get("cours"),
+            "revenu": periode.get("revenu"),
+            "resultat_net": periode.get("resultat_net"),
+            "ratios": [],
+            "verdict": None,
+        }
+
+        if sector_verdict == sectors.EXCLU:
+            entree["verdict"] = NON_CONFORME
+            entree["raison"] = sector_reason
+            serie.append(entree)
+            continue
+
+        ratios, depassement, manquants = _calcul_ratios(periode, std)
+        entree["ratios"] = ratios
+
+        if depassement:
+            entree["verdict"] = NON_CONFORME
+        elif not _denominateur(periode, std) or manquants:
+            entree["verdict"] = A_VERIFIER
+        elif sector_verdict == sectors.A_VERIFIER:
+            entree["verdict"] = A_VERIFIER
+        else:
+            entree["verdict"] = CONFORME
+
+        serie.append(entree)
+
+    return serie
 
 
 def purification(dividende, part_revenus_non_conformes):

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block titre %}Actualités{% endblock %}
+{% block description %}L'actualité des plus grandes valeurs de l'univers Tayyib, avec le verdict de conformité attaché à chaque société citée.{% endblock %}
+
+{% block contenu %}
+<main class="page">
+
+  <h1 class="titre-page">Actualités</h1>
+  <p class="chapeau">
+    Le fil des grandes valeurs de l'univers. Chaque article porte le verdict de
+    conformité de la société dont il parle : lire une actualité sur un titre exclu
+    sans le savoir n'aurait aucun intérêt ici.
+  </p>
+
+  <div class="encart encart-neutre">
+    <p><strong>Ce que cette rubrique n'est pas.</strong>
+    C'est une agrégation de dépêches financières générales, en anglais pour
+    l'essentiel, et non une revue de presse de la finance islamique. Nous
+    n'inventons pas une rédaction que nous n'avons pas. Sa seule valeur ajoutée
+    est le rapprochement avec le verdict — utile, mais modeste. Les rubriques
+    <a href="{{ url_for('analyses') }}">Analyses</a> et
+    <a href="{{ url_for('purification') }}">Purification</a> sont plus proches de
+    ce que nous savons vraiment produire.</p>
+  </div>
+
+  <div class="outils">
+    <div class="segments">
+      <a href="?standard={{ standard.id }}" class="{% if not filtre %}on{% endif %}">Toutes</a>
+      {% for v, libelle in [('conforme', 'Conformes'), ('a_verifier', 'À vérifier'), ('non_conforme', 'Non conformes')] %}
+        <a href="?standard={{ standard.id }}&amp;verdict={{ v }}" class="{% if filtre == v %}on{% endif %}">{{ libelle }}</a>
+      {% endfor %}
+    </div>
+    {% if articles %}
+      <span class="compte-filtre num">{{ articles | length }} article{{ 's' if articles | length > 1 }}</span>
+    {% endif %}
+  </div>
+
+  {% if articles %}
+    <div class="fil">
+      {% for a in articles %}
+        <a class="actu" href="{{ a.lien }}" target="_blank" rel="noopener noreferrer">
+          <div class="actu-tete">
+            {% if a.societe %}
+              <span class="actu-valeur">
+                {% if a.place %}<span class="drapeau">{{ a.place.drapeau }}</span>{% endif %}
+                {{ a.societe.nom | truncate(28, true, '…') }}
+              </span>
+            {% endif %}
+            {% if a.verdict %}
+              <span class="verdict v-{{ a.verdict }}">{{ engine.VERDICT_LABELS[a.verdict] }}</span>
+            {% endif %}
+          </div>
+          <div class="actu-titre">{{ a.titre }}</div>
+          {% if a.resume %}<p class="actu-resume">{{ a.resume }}</p>{% endif %}
+          <div class="actu-tete">
+            {% if a.source %}<span>{{ a.source }}</span>{% endif %}
+            {% if a.publie %}<span>· {{ a.publie | date_fr }}</span>{% endif %}
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="cadre">
+      <p class="vide">
+        {% if filtre %}
+          Aucun article ne concerne une valeur de cette catégorie.
+        {% else %}
+          Aucune actualité collectée. Lancez <code>python refresh.py --actus</code>.
+        {% endif %}
+      </p>
+    </div>
+  {% endif %}
+
+  {% if collecte %}
+    <p class="pied-liens" style="margin-top:22px">
+      Fil collecté le {{ collecte | date_fr }} sur les 60 plus grosses valeurs de l'univers.
+      Les liens ouvrent le site de l'éditeur d'origine.
+    </p>
+  {% endif %}
+
+</main>
+{% endblock %}

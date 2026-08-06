@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% block titre %}Zakat{% endblock %}
+{% block description %}Calculez la zakat due sur votre portefeuille d'actions : assiette selon l'intention de détention, nissab en or ou en argent au cours du jour, taux de 2,5 %.{% endblock %}
+
+{% block contenu %}
+<main class="page page-etroite">
+
+  <h1 class="titre-page">Zakat sur un portefeuille d'actions</h1>
+  <p class="chapeau">
+    La zakat est due chaque année lunaire sur un patrimoine qui dépasse le nissab.
+    Sur des actions, la difficulté n'est pas le taux — il est de 2,5 % — mais
+    l'assiette : ce sur quoi il s'applique dépend de la raison pour laquelle vous
+    détenez ces titres.
+  </p>
+
+  <h2 class="section">1. Votre intention de détention</h2>
+  <div class="calc">
+    <div class="calc-champs">
+      <div class="champ" style="flex-basis:100%">
+        <label for="intention">Pourquoi détenez-vous ces actions ?</label>
+        <select id="intention">
+          <option value="negoce">Pour les revendre — négoce (assiette : valeur de marché totale)</option>
+          <option value="long">Pour les conserver et percevoir les dividendes (assiette : actifs zakatables)</option>
+        </select>
+        <p class="champ-aide" id="aide-intention"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="encart">
+    <p><strong>Pourquoi cette question détermine tout le reste.</strong>
+    Si vous achetez pour revendre, les actions sont une marchandise : la zakat porte
+    sur leur <em>valeur de marché entière</em>. Si vous les conservez pour le long
+    terme, la majorité des savants contemporains considère que vous ne devez la zakat
+    que sur votre quote-part des <em>actifs zakatables</em> de l'entreprise — sa
+    trésorerie, ses créances, ses stocks — et non sur ses usines ou ses brevets, qui
+    ne sont pas zakatables.</p>
+    <p>Cette seconde assiette ne se calcule proprement qu'à partir du bilan. Nous
+    l'approchons par la part de trésorerie et de créances rapportée au total du
+    bilan — un chiffre que nous avons déjà collecté pour le screening. C'est une
+    <strong>approximation</strong>, et elle est signalée comme telle sur chaque ligne :
+    l'AAOIFI recommande de retenir les stocks également, que Yahoo ne publie pas.</p>
+  </div>
+
+  <h2 class="section">2. Votre portefeuille</h2>
+  <div class="cadre">
+    <p class="vide" id="pf-vide">
+      Aucune ligne enregistrée. Ajoutez vos positions depuis la page
+      <a href="{{ url_for('portefeuille') }}">Portefeuille</a> — elles restent
+      dans votre navigateur, elles ne nous sont jamais transmises.
+    </p>
+    <div class="defilement" id="pf-table" hidden>
+      <table>
+        <thead>
+          <tr>
+            <th>Valeur</th>
+            <th class="a-droite">Actions</th>
+            <th class="a-droite">Cours</th>
+            <th class="a-droite">Valeur</th>
+            <th class="a-droite">Assiette zakatable</th>
+          </tr>
+        </thead>
+        <tbody id="pf-lignes"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="calc" style="margin-top:14px">
+    <div class="calc-champs">
+      <div class="champ">
+        <label for="autres">Autres avoirs zakatables (€)</label>
+        <input type="number" id="autres" min="0" step="0.01" placeholder="épargne, or, espèces…">
+        <p class="champ-aide">Comptes courants, épargne, or physique, créances sur autrui.</p>
+      </div>
+      <div class="champ">
+        <label for="dettes">Dettes exigibles (€)</label>
+        <input type="number" id="dettes" min="0" step="0.01" placeholder="à déduire">
+        <p class="champ-aide">Les dettes échues, à déduire de l'assiette.</p>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="section">3. Le nissab</h2>
+  {% if metaux and (metaux.nissab_or or metaux.nissab_argent) %}
+    <div class="calc">
+      <div class="calc-champs">
+        <div class="champ" style="flex-basis:100%">
+          <label for="nissab">Référence retenue</label>
+          <select id="nissab">
+            {% if metaux.nissab_or %}
+              <option value="{{ metaux.nissab_or }}">Or — 85 g, soit {{ metaux.nissab_or | nombre(0) }} €</option>
+            {% endif %}
+            {% if metaux.nissab_argent %}
+              <option value="{{ metaux.nissab_argent }}">Argent — 595 g, soit {{ metaux.nissab_argent | nombre(0) }} €</option>
+            {% endif %}
+          </select>
+          <p class="champ-aide">
+            Or à {{ metaux.or | nombre(2) if metaux.or }} €/g, argent à
+            {{ metaux.argent | nombre(2) if metaux.argent }} €/g, au dernier cours collecté.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="encart">
+      <p><strong>Les deux nissabs ne donnent pas le même seuil, et l'écart est considérable.</strong>
+      Celui de l'argent est bien plus bas, donc rend la zakat due à beaucoup plus de
+      monde. Les écoles divergent sur celui qu'il faut retenir : plusieurs
+      recommandent l'argent, précisément parce qu'il élargit le nombre de
+      bénéficiaires. Nous calculons les deux et ne choisissons pas à votre place —
+      ce n'est pas le rôle d'un screener.</p>
+    </div>
+  {% else %}
+    <div class="calc">
+      <div class="calc-champs">
+        <div class="champ" style="flex-basis:100%">
+          <label for="nissab-manuel">Nissab (€)</label>
+          <input type="number" id="nissab-manuel" min="0" step="1" placeholder="ex. 6000">
+          <p class="champ-aide">
+            Le cours de l'or et de l'argent n'a pas pu être collecté. Saisissez le
+            nissab : 85 g d'or, ou 595 g d'argent, au cours du jour.
+          </p>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <h2 class="section">4. Zakat due</h2>
+  <div class="verdict-geant">
+    <div class="vg-case">
+      <div class="vg-lb">Assiette retenue</div>
+      <div class="vg-val" id="assiette">—</div>
+      <div class="vg-note" id="note-assiette">Renseignez votre portefeuille.</div>
+    </div>
+    <div class="vg-case">
+      <div class="vg-lb">Nissab</div>
+      <div class="vg-val" id="nissab-val">—</div>
+      <div class="vg-note" id="note-nissab"></div>
+    </div>
+    <div class="vg-case accent">
+      <div class="vg-lb">Zakat due (2,5 %)</div>
+      <div class="vg-val" id="zakat">—</div>
+      <div class="vg-note" id="note-zakat"></div>
+    </div>
+  </div>
+
+  <div class="encart encart-neutre">
+    <p><strong>Ce que ce calculateur ne remplace pas.</strong>
+    L'année lunaire (<em>hawl</em>) doit être révolue sur le patrimoine, et c'est à
+    vous de savoir depuis quand vous avez franchi le nissab. Les avis divergent aussi
+    sur le traitement des plans d'épargne bloqués, des actions non cotées et de
+    l'assurance-vie. Ce calcul donne un ordre de grandeur documenté, pas une fatwa :
+    pour une situation patrimoniale réelle, consultez un savant qualifié.</p>
+  </div>
+
+</main>
+
+<script>
+// Aucun envoi au serveur : les lignes viennent du stockage local, comme
+// sur les pages Portefeuille et Purification.
+(function () {
+  var CLE = 'tayyib.portefeuille.v1';
+  var TAUX_ZAKAT = 0.025;
+
+  var univers = {}, lignes = [];
+
+  function euro(n) {
+    return n.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+  }
+
+  function charge() {
+    try { return JSON.parse(localStorage.getItem(CLE)) || []; }
+    catch (e) { return []; }
+  }
+
+  var elIntention = document.getElementById('intention'),
+      elAide = document.getElementById('aide-intention'),
+      elLignes = document.getElementById('pf-lignes'),
+      elTable = document.getElementById('pf-table'),
+      elVide = document.getElementById('pf-vide'),
+      elAutres = document.getElementById('autres'),
+      elDettes = document.getElementById('dettes'),
+      elNissab = document.getElementById('nissab') || document.getElementById('nissab-manuel');
+
+  var AIDES = {
+    negoce: "L'assiette est la valeur de marché entière de vos lignes.",
+    long: "L'assiette est votre quote-part des actifs zakatables de chaque société, approchée par la part de trésorerie et de créances au bilan."
+  };
+
+  function part_zakatable(v) {
+    // Trésorerie + créances rapportées au total du bilan : la fraction de
+    // l'entreprise qui est zakatable. Sans bilan, on retombe sur 100 % —
+    // le sens conservateur, et il est affiché.
+    if (!v || !v.total_assets) return null;
+    var liquide = (v.cash || 0) + (v.creances || 0);
+    return Math.min(1, liquide / v.total_assets);
+  }
+
+  function rendre() {
+    var negoce = elIntention.value === 'negoce';
+    elAide.textContent = AIDES[elIntention.value];
+
+    var actives = lignes.filter(function (l) { return univers[l.ticker]; });
+
+    if (!actives.length) {
+      elTable.hidden = true; elVide.hidden = false;
+    } else {
+      elTable.hidden = false; elVide.hidden = true;
+    }
+
+    elLignes.innerHTML = '';
+    var totalActions = 0;
+
+    actives.forEach(function (l) {
+      var v = univers[l.ticker];
+      // On valorise en euros convertis : additionner une ligne saoudienne
+      // et une ligne parisienne dans leurs devises respectives donnerait un
+      // total dénué de sens.
+      var valeur = (v.prix_eur || 0) * l.qte;
+      var part = negoce ? 1 : part_zakatable(v);
+      var approx = !negoce && part === null;
+      if (part === null) part = 1;
+      var assiette = valeur * part;
+      totalActions += assiette;
+
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><strong>' + v.nom + '</strong><div class="ticker">' + l.ticker +
+          (v.devise && v.devise !== 'EUR' ? ' · ' + v.devise : '') + '</div></td>' +
+        '<td class="a-droite">' + l.qte + '</td>' +
+        '<td class="a-droite">' + (v.prix ? v.prix.toLocaleString('fr-FR') + ' ' + (v.devise || '') : '—') + '</td>' +
+        '<td class="a-droite">' + euro(valeur) + '</td>' +
+        '<td class="a-droite">' + euro(assiette) +
+          (negoce ? '' : '<div class="ticker">' +
+            (approx ? 'bilan absent — 100 % retenu' : Math.round(part * 100) + ' % du bilan') +
+            '</div>') +
+        '</td>';
+      elLignes.appendChild(tr);
+    });
+
+    var autres = parseFloat(elAutres.value) || 0;
+    var dettes = parseFloat(elDettes.value) || 0;
+    var assiette = Math.max(0, totalActions + autres - dettes);
+    var nissab = parseFloat(elNissab && elNissab.value) || 0;
+
+    document.getElementById('assiette').textContent = assiette ? euro(assiette) : '—';
+    document.getElementById('note-assiette').textContent =
+      negoce ? 'Valeur de marché totale.' : 'Quote-part des actifs zakatables.';
+
+    document.getElementById('nissab-val').textContent = nissab ? euro(nissab) : '—';
+
+    var elZakat = document.getElementById('zakat');
+    var elNote = document.getElementById('note-zakat');
+
+    if (!assiette || !nissab) {
+      elZakat.textContent = '—';
+      elNote.textContent = nissab ? '' : 'Renseignez le nissab.';
+      document.getElementById('note-nissab').textContent = '';
+      return;
+    }
+
+    if (assiette < nissab) {
+      elZakat.textContent = '0,00 €';
+      elNote.textContent = 'Assiette sous le nissab : la zakat n\'est pas due.';
+      document.getElementById('note-nissab').textContent = 'Seuil non atteint.';
+    } else {
+      elZakat.textContent = euro(assiette * TAUX_ZAKAT);
+      elNote.textContent = 'Si l\'année lunaire est révolue sur ce patrimoine.';
+      document.getElementById('note-nissab').textContent = 'Seuil dépassé.';
+    }
+  }
+
+  fetch('/api/univers.json?standard={{ standard.id }}')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      data.valeurs.forEach(function (v) { univers[v.ticker] = v; });
+      lignes = charge();
+      rendre();
+    })
+    .catch(function () {
+      elVide.textContent = 'Univers indisponible : impossible de valoriser le portefeuille.';
+    });
+
+  [elIntention, elAutres, elDettes, elNissab].forEach(function (el) {
+    if (el) el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', rendre);
+  });
+
+  elAide.textContent = AIDES.negoce;
+})();
+</script>
+{% endblock %}

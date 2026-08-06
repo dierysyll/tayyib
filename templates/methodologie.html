@@ -10,6 +10,50 @@
     cet outil ne sait pas faire.
   </p>
 
+  <h2 id="couverture">Les places couvertes</h2>
+  <p>
+    {{ total }} valeurs sont actuellement dans le cache, réparties sur les places
+    ci-dessous. Une place n'est retenue que si Yahoo Finance en publie les
+    <strong>bilans datés</strong> : sans bilan, aucun ratio n'est calculable, et un
+    screener qui affiche une valeur sans pouvoir la juger ne rend pas service.
+  </p>
+
+  {% for region in regions %}
+    <h3>{{ region.nom }}</h3>
+    <p>{{ region.resume }}</p>
+    <ul>
+      {% for p in region.places %}
+        <li>
+          <strong>{{ p.drapeau }} {{ p.nom }}</strong> — {{ p.pays }}, {{ p.indice }},
+          coté en {{ p.devise }}{% if p.id not in collectees %} <em>(pas encore collectée)</em>{% endif %}.
+          {% if p.note %}{{ p.note }}{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endfor %}
+
+  <h3>Ce que nous ne couvrons pas, et pourquoi</h3>
+  <p>
+    Ces absences sont d'autant plus regrettables qu'elles frappent précisément le
+    public de cet outil. Les annoncer vaut mieux que de vous laisser les découvrir
+    en cherchant une valeur qui n'y est pas.
+  </p>
+  <ul>
+    {% for a in absentes %}
+      <li><strong>{{ a.drapeau }} {{ a.nom }}</strong> ({{ a.pays }}) — {{ a.raison }}</li>
+    {% endfor %}
+  </ul>
+
+  <h3>Les devises</h3>
+  <p>
+    Les capitalisations sont converties en euros pour pouvoir être comparées et
+    triées d'une place à l'autre ; le montant en devise de cotation figure sur
+    chaque fiche. Les <strong>ratios de screening ne sont jamais convertis</strong>, et
+    n'ont pas à l'être : dette et capitalisation d'une même société sont dans la
+    même devise, le rapport est donc invariant. Un taux de change erroné fausserait
+    l'ordre d'affichage, jamais un verdict.
+  </p>
+
   <h2>Deux filtres, dans cet ordre</h2>
   <p>
     Le screening se fait en deux temps. D'abord <strong>l'activité</strong> : une
