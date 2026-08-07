@@ -7,8 +7,13 @@ Les deux références du screening halal — Zoya et Musaffa — sont anglophone
 centrées sur les valeurs américaines. Un investisseur francophone qui détient
 un PEA n'y trouve pas ses valeurs, et un musulman qui veut regarder Riyad,
 Istanbul ou Kuala Lumpur n'y trouve pas davantage son compte. Tayyib est né du
-premier manque — Euronext Paris — et couvre aujourd'hui **28 places** sur
+premier manque — Euronext Paris — et couvre aujourd'hui **29 places** sur
 quatre continents. Paris reste la place de référence.
+
+Parmi elles, la **BRVM d'Abidjan**, place commune aux huit pays de l'UEMOA :
+absente de Yahoo Finance, elle est collectée directement à sa source. C'est
+la seule place où un épargnant sénégalais ou ivoirien achète dans sa propre
+monnaie, et aucun autre screener halal ne la couvre.
 
 ## Ce que fait l'application
 
@@ -113,6 +118,7 @@ screening/
 data/
   universe.py           les places de marché et leurs valeurs
   yahoo.py              collecte (bilan daté + capitalisation + actualités)
+  brvm.py               collecte directe de la cote d'Abidjan
   presse.py             flux RSS francophones, en trois rubriques
   fx.py                 taux de change, cours de l'or et de l'argent
   cache.py              cache disque en deux étages
@@ -150,6 +156,7 @@ de vingt heures n'est pas redemandé, et l'index est réécrit tous les quarante
 titres, de sorte que le site sert un univers qui grandit pendant la collecte.
 
 ```bash
+.venv/bin/python refresh.py --brvm                 # seulement la cote d'Abidjan
 .venv/bin/python refresh.py --places paris,riyad   # une ou plusieurs places
 .venv/bin/python refresh.py --force                # tout redemander
 .venv/bin/python refresh.py --actus                # seulement le fil d'actualité
@@ -160,13 +167,15 @@ titres, de sorte que le site sert un univers qui grandit pendant la collecte.
 
 - Le **filtre des 5 %** n'est pas calculable (voir plus haut). C'est la
   principale limite, et elle est structurelle.
-- Les deux places les plus utiles à un francophone d'Afrique sont **absentes**
-  de Yahoo Finance. La **BRVM d'Abidjan** n'y existe pas du tout, ce qui prive
-  huit pays d'un screening. **Casablanca** n'y est pas servie non plus, et la
-  source le dit mal : elle répond « Too Many Requests » là où elle devrait
-  répondre « symbole inconnu », ce qui donne l'illusion d'une place
-  récupérable en réessayant. Tunis, Lagos, Mascate et Manama sont dans le même
-  cas.
+- Sur la **BRVM**, seuls les **cours** sont collectés. Les états financiers
+  existent — la BRVM publie les PDF au plan SYSCOHADA — mais l'extracteur
+  reste à écrire. En attendant, le filtre sectoriel s'applique pleinement
+  (les seize banques de la cote sont exclues sans bilan), et le reste est
+  « à vérifier ».
+- **Casablanca** n'est toujours pas couverte, et la source le dit mal : elle
+  répond « Too Many Requests » là où elle devrait répondre « symbole
+  inconnu », ce qui donne l'illusion d'une place récupérable en réessayant.
+  Tunis, Lagos, Mascate et Manama sont dans le même cas.
 - Le **Dow Jones** rapporte les montants à la capitalisation *moyenne sur
   24 mois* ; nous utilisons celle du jour. Sur une valeur volatile, le
   verdict peut différer de l'indice officiel.

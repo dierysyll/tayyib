@@ -473,6 +473,10 @@ def place(place_id):
         for sid, std in standards.STANDARDS.items()
     ]
 
+    # Toutes les places ne publient pas de capitalisation : celles que nous
+    # collectons nous-mêmes n'en ont pas encore.
+    avec_capi = any(e["societe"].get("market_cap_eur") for e in sur_place)
+
     langue = _langue()
     secteurs = {}
     for e in sur_place:
@@ -493,7 +497,13 @@ def place(place_id):
         declarees=len(infos["valeurs"]),
         par_standard=par_standard,
         secteurs=sorted(secteurs.values(), key=lambda s: -s["total"]),
-        vedettes=_trier(sur_place, "capitalisation")[:12],
+        # Sur une place sans capitalisation publiée — la BRVM aujourd'hui —
+        # trier par taille revient à ne pas trier du tout, et la page
+        # s'ouvrait sur quatre banques exclues. On retombe alors sur l'ordre
+        # par conformité : un screener sert à trouver, pas à parcourir des
+        # rejets.
+        vedettes=_trier(sur_place, "capitalisation" if avec_capi else "pertinence")[:12],
+        avec_capi=avec_capi,
         standard=standards.get(standard_id),
         standards=standards.STANDARDS,
         fetched_at=fetched_at,

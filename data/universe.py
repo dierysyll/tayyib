@@ -14,15 +14,18 @@ souvent une raison particulière de s'intéresser à Riyad, Istanbul, Kuala
 Lumpur ou Casablanca. Couvrir ces places n'est pas de l'expansionnisme :
 c'est la même promesse, tenue jusqu'au bout.
 
-Ce que Yahoo ne couvre pas, et qu'il faut dire
-----------------------------------------------
-Deux absences sont douloureuses parce qu'elles frappent précisément le
-public visé :
+Quand la source ne suffit pas, on va la chercher ailleurs
+---------------------------------------------------------
+La **BRVM** d'Abidjan — la place commune aux huit pays de l'UEMOA — est
+absente de Yahoo, et c'était l'absence la plus coûteuse : elle privait de
+screening les épargnants pour qui ce produit a été écrit. Elle n'est plus
+un trou. Nous la collectons directement auprès de la BRVM (voir
+`data/brvm.py`), ce qui prouve au passage qu'une place manquante n'est pas
+une fatalité : c'est un collecteur à écrire.
 
-  - la **BRVM** (Abidjan), place commune aux huit pays de l'UEMOA, est
-    totalement absente de Yahoo. Aucun contournement : ni cotation, ni
-    bilan, ni capitalisation ;
-  - **Casablanca** non plus, et il a fallu le vérifier pour s'en
+Restent celles où même la source primaire ne donne rien d'exploitable :
+
+  - **Casablanca**, et il a fallu le vérifier pour s'en
     convaincre : Yahoo ne répond pas « symbole inconnu » sur les valeurs
     marocaines, il répond « Too Many Requests ». L'erreur laisse croire à
     une limitation de débit passagère, et donc à une place récupérable en
@@ -33,10 +36,10 @@ public visé :
   - **Tunis**, **Lagos**, **Mascate** et **Manama** sont dans le même cas,
     ou n'exposent qu'une cotation sans états financiers.
 
-Les deux places les plus utiles à un investisseur francophone d'Afrique —
-la BRVM et Casablanca — sont donc précisément celles que la source ne
-couvre pas. C'est la limite la plus sérieuse de ce produit, et elle est
-affichée telle quelle plutôt que contournée.
+Casablanca reste donc la place manquante qui coûte le plus, et elle est
+affichée telle quelle en Méthodologie plutôt que contournée. La Bourse de
+Casablanca publie ses cotations sur son propre site : le jour où quelqu'un
+écrira ce collecteur-là, elle rejoindra la BRVM.
 
 Ces trous sont affichés dans l'interface (voir la page Méthodologie).
 Prétendre à une couverture mondiale qu'on n'a pas serait exactement le
@@ -54,6 +57,8 @@ verdict parfaitement cohérent sur la mauvaise société — c'est le genre
 d'erreur qu'aucun test ne rattrape. `refresh.py` affiche le nom renvoyé
 par Yahoo pour chaque symbole : c'est là qu'on vérifie.
 """
+
+from data import brvm
 
 # Les grands ensembles, dans l'ordre où ils sont proposés à l'utilisateur.
 # L'Europe d'abord : c'est là que se trouve le lecteur visé, et son PEA.
@@ -456,6 +461,21 @@ PLACES = {
     },
 
     # Monde musulman
+    #
+    # La BRVM ouvre la région, et non par courtoisie : c'est la seule place
+    # où un épargnant de l'UEMOA achète dans sa propre monnaie, sans compte
+    # à l'étranger. Elle est aussi la seule que nous collectons nous-mêmes.
+    "brvm": {
+        "nom": "BRVM (Abidjan)", "pays": "UEMOA — huit pays d'Afrique de l'Ouest",
+        "code": "UEMOA", "devise": "XOF",
+        "region": "monde-musulman", "indice": "BRVM Composite · BRVM 30",
+        "source": "brvm",
+        "note": "Place absente de Yahoo Finance : nous la collectons directement "
+                "auprès de la BRVM. Les cours sont à jour ; les états financiers "
+                "ne sont pas encore lus, si bien que les valeurs dont l'activité "
+                "ne tranche pas restent « à vérifier ».",
+        "valeurs": brvm.tickers(),
+    },
     "riyad": {
         "nom": "Riyad", "pays": "Arabie saoudite", "code": "SA", "devise": "SAR",
         "region": "monde-musulman", "indice": "Tadawul · TASI",
@@ -522,13 +542,6 @@ PLACES = {
 # Elles sont affichées telles quelles dans la page Méthodologie : une
 # absence annoncée vaut mieux qu'une absence constatée par l'utilisateur.
 PLACES_ABSENTES = [
-    {
-        "nom": "BRVM (Abidjan)", "code": "UEMOA",
-        "pays": "Bénin, Burkina Faso, Côte d'Ivoire, Guinée-Bissau, Mali, Niger, Sénégal, Togo",
-        "raison": "Aucun symbole BRVM n'existe chez Yahoo Finance : ni cotation, "
-                  "ni bilan, ni capitalisation. C'est l'absence qui nous coûte le "
-                  "plus, puisqu'elle prive huit pays francophones d'un screening.",
-    },
     {
         "nom": "Casablanca", "code": "MA", "pays": "Maroc",
         "raison": "Le suffixe `.CS` n'est pas servi par Yahoo Finance. "

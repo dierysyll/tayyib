@@ -37,7 +37,7 @@ import sys
 import threading
 import time
 
-from data import cache, fx, presse, universe, yahoo
+from data import brvm, cache, fx, presse, universe, yahoo
 
 TRAVAILLEURS = 3      # requêtes simultanées vers Yahoo
 PAUSE = 0.35          # secondes entre deux départs, par travailleur
@@ -107,9 +107,19 @@ def _places_demandees(arg):
 def collecte_valeurs(places, force=False):
     """Collecte les sociétés des places demandées. Renvoie (collectées, échecs)."""
     index_place = universe.place_par_ticker()
+
+    # Les places que nous collectons nous-mêmes sortent de la boucle Yahoo :
+    # interroger la BRVM valeur par valeur serait absurde, sa cote entière
+    # tient dans une seule page.
+    for place_id in places:
+        if universe.PLACES[place_id].get("source") == "brvm":
+            collecte_brvm()
+
     a_faire = []
     vus = set()
     for place_id in places:
+        if universe.PLACES[place_id].get("source"):
+            continue
         for ticker in universe.PLACES[place_id]["valeurs"]:
             if ticker not in vus:
                 vus.add(ticker)
@@ -175,6 +185,43 @@ def collecte_valeurs(places, force=False):
 
     _ecrire_index(taux)
     return len(a_faire) - len(bloques) - len(inconnus), bloques, inconnus
+
+
+def collecte_brvm():
+    """La cote de la BRVM, en une requête.
+
+    Contrairement à Yahoo, la source publie sa cote entière sur une page :
+    47 sociétés pour un aller-retour. On écrit les détails comme pour les
+    autres places, de sorte que l'index se construit sans traitement
+    particulier ensuite.
+    """
+    try:
+        societes = brvm.societes()
+    except Exception as exc:
+        print(f"BRVM : collecte impossible ({type(exc).__name__}) — "
+              f"on conserve la version en cache")
+        return 0
+
+    declares = set(brvm.tickers())
+    nouveaux = []
+    for societe in societes:
+        societe["place"] = "brvm"
+        # Pas de capitalisation publiée : la conversion en euros n'a pas
+        # d'objet tant que les états financiers ne sont pas lus.
+        societe["market_cap_eur"] = None
+        cache.save_detail(societe)
+        if societe["ticker"] not in declares:
+            nouveaux.append(societe["ticker"])
+
+    print(f"BRVM : {len(societes)} sociétés collectées")
+    if nouveaux:
+        print(f"  {len(nouveaux)} symboles nouveaux à déclarer dans data/brvm.py : "
+              f"{', '.join(nouveaux)}")
+    manquants = declares - {s["ticker"] for s in societes}
+    if manquants:
+        print(f"  {len(manquants)} déclarés mais absents de la cote : "
+              f"{', '.join(sorted(manquants))}")
+    return len(societes)
 
 
 def _ecrire_index(taux, avec_metaux=False):
@@ -249,12 +296,20 @@ def main():
                          help="collecte seulement le fil d'actualité")
     parseur.add_argument("--index", action="store_true",
                          help="réécrit seulement l'index depuis le disque")
+    parseur.add_argument("--brvm", action="store_true",
+                         help="collecte seulement la cote de la BRVM")
     args = parseur.parse_args()
 
     if args.index:
         taux = fx.collecte(_devises())
         print(f"{_ecrire_index(taux, avec_metaux=True)} valeurs réécrites dans l'index")
         return 0
+
+    if args.brvm:
+        n = collecte_brvm()
+        if n:
+            print(f"{_ecrire_index(fx.collecte(_devises()))} valeurs dans l'index")
+        return 0 if n else 1
 
     if args.actus:
         return 0 if collecte_actus() else 1

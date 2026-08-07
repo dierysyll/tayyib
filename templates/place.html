@@ -67,7 +67,7 @@
     une place industrielle, c'est l'inverse.
   </p>
 
-  <h2 class="section">Les plus grandes valeurs de la place</h2>
+  <h2 class="section">{{ "Les plus grandes valeurs de la place" if avec_capi else "Les valeurs de la place" }}</h2>
   <div class="cadre">
     <div class="defilement">
       <table>
@@ -77,7 +77,7 @@
             <th>Secteur</th>
             <th>Verdict {{ standard.label }}</th>
             <th class="a-droite">Rendement</th>
-            <th class="a-droite">Capitalisation</th>
+            <th class="a-droite">{{ "Capitalisation" if avec_capi else "Cours" }}</th>
           </tr>
         </thead>
         <tbody>
@@ -91,7 +91,10 @@
               <td class="secteur">{{ activite(s) or '—' }}</td>
               <td><span class="verdict v-{{ e.resultat.verdict }}">{{ engine.VERDICT_LABELS[e.resultat.verdict] }}</span></td>
               <td class="a-droite">{{ s | rendement }}</td>
-              <td class="a-droite">{{ s.market_cap_eur | euros }}</td>
+              <td class="a-droite">
+                {%- if avec_capi %}{{ s.market_cap_eur | euros }}
+                {%- else %}{{ s.prix | nombre(0) }} {{ s.currency }}{% endif %}
+              </td>
             </tr>
           {% endfor %}
         </tbody>
