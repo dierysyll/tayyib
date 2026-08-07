@@ -44,7 +44,7 @@ RUBRIQUES = {
     "marches": {
         "id": "marches",
         "nom": "Marchés",
-        "resume": "L'actualité économique et boursière.",
+        "resume": "L'économie et les marchés dans le monde entier — pas seulement en Europe.",
         "icone": "marche",
     },
     "afrique": {
@@ -67,31 +67,47 @@ RUBRIQUES = {
 # vide — mais l'interface les présente autrement.
 SOURCES = [
     # --- Marchés ---------------------------------------------------------
-    {"nom": "Le Monde Économie", "rubrique": "marches",
+    # « Marchés » ne veut pas dire « marchés français ». Un lecteur qui
+    # détient de l'Aramco, du Maybank ou du Nvidia n'a que faire d'un fil
+    # qui s'arrête à Euronext. Les deux premiers titres sont des
+    # généralistes mondiaux : RFI et France 24 couvrent l'Asie, les
+    # Amériques et l'Afrique en français, ce qu'aucun média boursier
+    # hexagonal ne fait gratuitement.
+    {"nom": "RFI Économie", "rubrique": "marches", "portee": "Monde",
+     "url": "https://www.rfi.fr/fr/economie/rss"},
+    {"nom": "France 24", "rubrique": "marches", "portee": "Monde",
+     "url": "https://www.france24.com/fr/rss"},
+    {"nom": "Le Monde Économie", "rubrique": "marches", "portee": "France",
      "url": "https://www.lemonde.fr/economie/rss_full.xml"},
-    {"nom": "Franceinfo Économie", "rubrique": "marches",
+    {"nom": "Franceinfo Économie", "rubrique": "marches", "portee": "France",
      "url": "https://www.francetvinfo.fr/economie.rss"},
-    {"nom": "La Tribune", "rubrique": "marches",
+    {"nom": "La Tribune", "rubrique": "marches", "portee": "France",
      "url": "https://www.latribune.fr/feed.xml"},
+    {"nom": "Challenges", "rubrique": "marches", "portee": "France",
+     "url": "https://www.challenges.fr/rss.xml"},
+    {"nom": "L'Usine Nouvelle", "rubrique": "marches", "portee": "Industrie",
+     "url": "https://www.usinenouvelle.com/rss"},
 
     # --- Afrique francophone --------------------------------------------
-    {"nom": "Financial Afrik", "rubrique": "afrique",
+    {"nom": "Financial Afrik", "rubrique": "afrique", "portee": "Afrique",
      "url": "https://financialafrik.com/feed/"},
-    {"nom": "RFI Afrique", "rubrique": "afrique",
+    {"nom": "RFI Afrique", "rubrique": "afrique", "portee": "Afrique",
      "url": "https://www.rfi.fr/fr/afrique/rss"},
-    {"nom": "Hespress", "rubrique": "afrique",
+    {"nom": "BBC Afrique", "rubrique": "afrique", "portee": "Afrique",
+     "url": "https://feeds.bbci.co.uk/afrique/rss.xml"},
+    {"nom": "Hespress", "rubrique": "afrique", "portee": "Maroc",
      "url": "https://fr.hespress.com/feed"},
-    {"nom": "Jeune Afrique", "rubrique": "afrique",
+    {"nom": "Jeune Afrique", "rubrique": "afrique", "portee": "Afrique",
      "url": "https://www.jeuneafrique.com/feed/"},
-    {"nom": "TSA Algérie", "rubrique": "afrique",
+    {"nom": "TSA Algérie", "rubrique": "afrique", "portee": "Algérie",
      "url": "https://www.tsa-algerie.com/feed/"},
 
     # --- Monde musulman --------------------------------------------------
-    {"nom": "Saphirnews", "rubrique": "monde-musulman",
+    {"nom": "Saphirnews", "rubrique": "monde-musulman", "portee": "France",
      "url": "https://www.saphirnews.com/xml/syndication.rss"},
-    {"nom": "Middle East Eye", "rubrique": "monde-musulman",
+    {"nom": "Middle East Eye", "rubrique": "monde-musulman", "portee": "Moyen-Orient",
      "url": "https://www.middleeasteye.net/fr/rss"},
-    {"nom": "Anadolu", "rubrique": "monde-musulman",
+    {"nom": "Anadolu", "rubrique": "monde-musulman", "portee": "Monde",
      "url": "https://www.aa.com.tr/fr/rss/default?cat=guncel"},
 ]
 
@@ -215,6 +231,7 @@ def _articles_du_flux(source, limite):
             "titre": sans_emoji(html.unescape(titre)),
             "lien": lien,
             "source": source["nom"],
+            "portee": source.get("portee"),
             "rubrique": source["rubrique"],
             "publie": _date(item),
             "resume": _texte_propre(item.findtext("description")),

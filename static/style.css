@@ -1113,3 +1113,63 @@ td.depasse { color: var(--rouge); }
   * { transition: none !important; animation: none !important; }
   .compteur:hover, .actu:hover, .bouton:hover { transform: none; }
 }
+
+/* La portée géographique d'une source. « Marchés » ne doit pas vouloir dire
+   « marchés français » : le lecteur voit d'où vient chaque dépêche. */
+.actu-portee {
+  display: inline-flex; align-items: center;
+  padding: 3px 9px; border-radius: var(--rayon-pill);
+  border: 1px solid var(--bord); font-size: 11px; font-weight: 600;
+  color: var(--texte-faible); letter-spacing: .02em;
+}
+
+/* --- Mini-carte de période ------------------------------------------------
+   Le zoom précédent se faisait en tirant un rectangle sur le graphique :
+   invisible, sans affordance, et en conflit avec le curseur de lecture.
+   Personne ne devine un geste qui ne se voit pas. La mini-carte montre
+   toute la série et la portion retenue, avec deux poignées à saisir. */
+
+.minicarte {
+  position: relative; height: 60px; margin-top: 14px;
+  background: var(--surface-2); border: 1px solid var(--bord);
+  border-radius: var(--rayon-s); overflow: hidden; cursor: pointer;
+  touch-action: none;
+}
+.minicarte[hidden] { display: none; }
+.minicarte-fond { position: absolute; inset: 0; width: 100%; height: 100%; }
+.mc-trait { stroke: var(--texte-faible); stroke-width: 1.2; }
+.mc-aire { fill: var(--texte-faible); fill-opacity: .12; }
+
+/* Les parties écartées sont voilées : on voit ce qu'on laisse de côté. */
+.minicarte-voile {
+  position: absolute; top: 0; bottom: 0;
+  background: var(--surface); opacity: .68; pointer-events: none;
+}
+#voile-gauche { left: 0; }
+
+.minicarte-fenetre {
+  position: absolute; top: 0; bottom: 0;
+  border: 1.5px solid var(--jade); border-radius: 5px;
+  background: var(--jade); background-clip: padding-box;
+  --teinte: transparent; cursor: grab;
+}
+.minicarte-fenetre { background-color: color-mix(in srgb, var(--jade) 10%, transparent); }
+.minicarte-fenetre:active { cursor: grabbing; }
+
+/* Poignées larges : sur un ruban de 60 px, une zone de saisie étroite est
+   inutilisable, surtout au doigt. */
+.poignee {
+  position: absolute; top: 0; bottom: 0; width: 14px;
+  display: grid; place-items: center; cursor: ew-resize;
+}
+.poignee::before {
+  content: ""; width: 4px; height: 22px; border-radius: 3px;
+  background: var(--jade); box-shadow: 0 0 0 2px var(--surface);
+}
+.poignee-g { left: -7px; }
+.poignee-d { right: -7px; }
+
+.minicarte-aide {
+  font-size: 12.5px; color: var(--texte-faible);
+  margin: 8px 0 0; line-height: 1.5;
+}

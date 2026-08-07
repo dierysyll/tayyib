@@ -11,6 +11,7 @@
     {% endif %}
     <div class="actu-tete">
       {% if a.source %}<span class="actu-source">{{ a.source }}</span>{% endif %}
+      {% if a.portee %}<span class="actu-portee">{{ a.portee }}</span>{% endif %}
       {% if a.societe %}
         <span class="actu-valeur">
           {% if a.place %}{{ pays(a.place.code, a.place.region) }}{% endif %}
