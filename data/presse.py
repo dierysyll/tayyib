@@ -87,6 +87,15 @@ SOURCES = [
      "url": "https://www.challenges.fr/rss.xml"},
     {"nom": "L'Usine Nouvelle", "rubrique": "marches", "portee": "Industrie",
      "url": "https://www.usinenouvelle.com/rss"},
+    # La francophonie ne se limite pas à la France : le Québec suit Wall
+    # Street de près, la Suisse est une place financière majeure. Ces trois
+    # titres apportent un regard non hexagonal sur les mêmes marchés.
+    {"nom": "Radio-Canada Économie", "rubrique": "marches", "portee": "Amériques",
+     "url": "https://ici.radio-canada.ca/rss/4159"},
+    {"nom": "La Presse Affaires", "rubrique": "marches", "portee": "Amériques",
+     "url": "https://www.lapresse.ca/affaires/rss"},
+    {"nom": "Le Temps", "rubrique": "marches", "portee": "Suisse",
+     "url": "https://www.letemps.ch/articles.rss"},
 
     # --- Afrique francophone --------------------------------------------
     {"nom": "Financial Afrik", "rubrique": "afrique", "portee": "Afrique",
@@ -143,6 +152,17 @@ def sans_emoji(texte):
     if not texte:
         return texte
     return ESPACES.sub(" ", EMOJIS.sub("", texte)).strip()
+
+
+def resume_propre(brut, limite=240):
+    """Un résumé lisible, quelle qu'en soit la provenance.
+
+    Yahoo mêle du texte nu et des fragments HTML dans le même champ : une
+    dépêche Reuters arrivait avec « <body><p>STORY: … &nbsp; » affiché tel
+    quel dans la carte. Le nettoyage est donc partagé avec la presse plutôt
+    que dupliqué à moitié.
+    """
+    return _texte_propre(brut, limite)
 
 
 def _texte_propre(brut, limite=240):
@@ -256,4 +276,43 @@ def collecte(par_source=12):
             vus.add(article["lien"])
             uniques.append(article)
 
-    return uniques
+    return _entrelace(uniques)
+
+
+def _entrelace(articles):
+    """Alterne les origines plutôt que de trier par la seule date.
+
+    Un tri chronologique pur laisse la France occuper tout le haut de page :
+    non parce qu'elle produit une actualité plus importante, mais parce
+    qu'elle compte plus de titres dans la liste. Le lecteur voit alors « des
+    sources françaises » là où la rubrique prétend couvrir le monde.
+
+    On distribue donc à tour de rôle entre les portées, chacune restant
+    ordonnée par date. Les articles les plus récents remontent toujours,
+    mais aucune origine ne monopolise les premières cartes.
+    """
+    # L'entrelacement se fait **rubrique par rubrique**. Mélanger toutes les
+    # rubriques ferait prendre le créneau « Monde » de la rubrique Marchés
+    # par un titre du monde musulman, et les fils mondiaux disparaîtraient
+    # du haut de page — l'inverse de ce qu'on cherche.
+    par_rubrique = {}
+    for article in articles:
+        par_rubrique.setdefault(article.get("rubrique"), []).append(article)
+
+    sortie = []
+    for rubrique, lot in par_rubrique.items():
+        files = {}
+        for article in lot:
+            files.setdefault(article.get("portee") or "—", []).append(article)
+
+        # La portée la plus large ouvre le tour : « Monde » avant « France ».
+        ordre = sorted(files, key=lambda p: (p != "Monde", p))
+        reste = True
+        while reste:
+            reste = False
+            for portee in ordre:
+                file = files[portee]
+                if file:
+                    sortie.append(file.pop(0))
+                    reste = True
+    return sortie

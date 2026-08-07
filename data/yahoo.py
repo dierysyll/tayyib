@@ -38,7 +38,7 @@ Deux précautions rendent ce calcul juste :
 
 import yfinance as yf
 
-from data.presse import sans_emoji
+from data.presse import sans_emoji, resume_propre
 
 
 class SourceIndisponible(Exception):
@@ -345,13 +345,26 @@ def _article(brut, ticker):
 
     # Même nettoyage que pour la presse : l'interface n'emploie aucun emoji,
     # les titres agrégés ne doivent pas en réintroduire.
+    # Yahoo publie une vignette sous `thumbnail` — plusieurs résolutions,
+    # plus l'originale. On prend l'originale : les cartes du fil font
+    # jusqu'à 400 px de large, et une vignette basse définition y bave.
+    vignette = None
+    miniature = contenu.get("thumbnail") if isinstance(contenu.get("thumbnail"), dict) else None
+    if miniature:
+        vignette = miniature.get("originalUrl")
+        if not vignette:
+            resolutions = miniature.get("resolutions") or []
+            if resolutions and isinstance(resolutions[0], dict):
+                vignette = resolutions[0].get("url")
+
     return {
         "ticker": ticker,
         "titre": sans_emoji(titre),
+        "image": vignette,
         "lien": lien,
         "source": source,
         "publie": publie,
-        "resume": sans_emoji(_texte(contenu.get("summary"), contenu.get("description"))),
+        "resume": resume_propre(_texte(contenu.get("summary"), contenu.get("description"))),
     }
 
 
