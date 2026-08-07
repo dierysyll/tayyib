@@ -166,6 +166,12 @@ def fetch(ticker):
         "prix": info.get("currentPrice") or info.get("regularMarketPrice"),
         "dividende_par_action": info.get("dividendRate"),
         "rendement": info.get("dividendYield"),
+        # Variation de la séance, telle que Yahoo la publie. Elle se déduirait
+        # de la série de cours, mais seulement au pas hebdomadaire : pour la
+        # séance du jour il faut la demander.
+        "variation": (info.get("regularMarketChangePercent") or 0) / 100
+                     if info.get("regularMarketChangePercent") is not None else None,
+        "cloture_precedente": info.get("regularMarketPreviousClose"),
         "site": info.get("website"),
         "resume": info.get("longBusinessSummary"),
         "salaries": info.get("fullTimeEmployees"),

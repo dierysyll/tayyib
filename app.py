@@ -17,7 +17,8 @@ from flask import Flask, abort, jsonify, render_template, request
 
 import charts
 from data import cache, fx, presse, universe, yahoo
-from screening import alias, analyses, engine, notation, standards, vocabulaire
+from screening import (alias, analyses, bascule, engine, notation, standards,
+                       vocabulaire)
 
 app = Flask(__name__)
 
@@ -291,6 +292,7 @@ def valeur(ticker):
         "valeur.html",
         bascule_cours=bascule_cours,
         note=notation.note(resultat),
+        condition=bascule.resume(societe, standard_id),
         depeches=depeches,
         societe=societe,
         place=universe.PLACES.get(societe.get("place")),
@@ -617,6 +619,55 @@ def portefeuille():
         standard=standards.get(standard_id),
         standards=standards.STANDARDS,
     )
+
+
+@app.route("/suivi")
+def suivi():
+    """Les valeurs qu'on surveille, et ce qu'il faudrait pour qu'elles
+    basculent.
+
+    Comme le portefeuille, la liste vit dans le navigateur : surveiller une
+    valeur n'est pas une information que ce site a besoin de détenir.
+    """
+    standard_id = _standard_demande()
+    return render_template(
+        "suivi.html",
+        standard=standards.get(standard_id),
+        standards=standards.STANDARDS,
+    )
+
+
+@app.route("/api/bascule.json")
+def api_bascule():
+    """Conditions de bascule et verdicts, pour la page de suivi.
+
+    Un seul appel pour toute la liste : la page est consultée pour
+    comparer plusieurs valeurs, pas une seule.
+    """
+    standard_id = _standard_demande()
+    demandes = [t for t in (request.args.get("tickers") or "").split(",") if t]
+    valeurs, _, _ = cache.index()
+    index_valeurs = {v["ticker"]: v for v in valeurs}
+
+    reponse = []
+    for ticker in demandes[:60]:
+        societe = index_valeurs.get(ticker)
+        if not societe:
+            continue
+        resultat = engine.evaluate(societe, standard_id)
+        reponse.append({
+            "ticker": ticker,
+            "nom": societe["nom"],
+            "place": societe.get("place"),
+            "prix": societe.get("prix"),
+            "devise": societe.get("currency"),
+            "variation": societe.get("variation"),
+            "verdict": resultat["verdict"],
+            "raison": resultat["raison"],
+            "note": notation.note(resultat),
+            "condition": bascule.resume(societe, standard_id),
+        })
+    return jsonify({"standard": standards.get(standard_id)["label"], "valeurs": reponse})
 
 
 @app.route("/outils")

@@ -37,6 +37,7 @@
       <a href="{{ url_for('analyses') }}" class="{% if request.endpoint == 'analyses' %}on{% endif %}">Analyses</a>
       <a href="{{ url_for('actualites') }}" class="{% if request.endpoint == 'actualites' %}on{% endif %}">Actualités</a>
       <a href="{{ url_for('portefeuille') }}" class="{% if request.endpoint == 'portefeuille' %}on{% endif %}">Portefeuille</a>
+      <a href="{{ url_for('suivi') }}" class="{% if request.endpoint == 'suivi' %}on{% endif %}">Suivi</a>
       {#- Purification, Zakat et les calculateurs se rejoignent sous « Outils » :
           huit onglets ne se lisent plus, ils se subissent. -#}
       <a href="{{ url_for('outils') }}"

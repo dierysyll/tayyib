@@ -1173,3 +1173,76 @@ td.depasse { color: var(--rouge); }
   font-size: 12.5px; color: var(--texte-faible);
   margin: 8px 0 0; line-height: 1.5;
 }
+
+/* --- Le graphique passe sur fond sombre -----------------------------------
+   Un tracé vert clair sur fond blanc a un contraste médiocre : la courbe se
+   confond avec son aire de remplissage, la grille se perd, et les repères
+   d'arrêté comptable ne ressortent plus. Les terminaux boursiers travaillent
+   tous sur fond sombre pour la même raison — ce n'est pas une coquetterie,
+   c'est ce qui rend un tracé fin lisible.
+
+   Le panneau garde donc sa couleur quel que soit le thème de la page. Les
+   variables sont redéfinies localement, ce qui laisse le reste du site
+   intact. */
+
+.cadre.graphique {
+  --fond-graphe: #0d1420;
+  --grille-graphe: #1f2b3d;
+  background: var(--fond-graphe);
+  border-color: #1b2536;
+}
+
+.cadre.graphique .courbe { background: transparent; }
+.cadre.graphique .grille { stroke: var(--grille-graphe); }
+.cadre.graphique .axe-y,
+.cadre.graphique .axe-x,
+.cadre.graphique .etiq-repere { fill: #7d8ea8; }
+
+/* La courbe : un jade vif, épaissi d'un cheveu. Sur fond sombre il porte
+   sans avoir besoin d'être criard. */
+.cadre.graphique .trait { stroke: #2fe0a6; stroke-width: 2.1; }
+.cadre.graphique .deg-haut { stop-color: #2fe0a6; stop-opacity: .30; }
+.cadre.graphique .deg-bas { stop-color: #2fe0a6; stop-opacity: 0; }
+
+.cadre.graphique .extremum { fill: #b9c7dc; }
+.cadre.graphique .etiq-extremum { fill: #d6e0ee; }
+
+/* Les repères de conformité gardent le code couleur du site, relevé pour
+   tenir sur le fond sombre. */
+.cadre.graphique .rv-conforme { fill: #2fe0a6; }
+.cadre.graphique line.rv-conforme { stroke: #2fe0a6; }
+.cadre.graphique .rv-a_verifier { fill: #f5bb4a; }
+.cadre.graphique line.rv-a_verifier { stroke: #f5bb4a; }
+.cadre.graphique .rv-non_conforme { fill: #ff6b8e; }
+.cadre.graphique line.rv-non_conforme { stroke: #ff6b8e; }
+.cadre.graphique .repere { stroke: var(--fond-graphe); stroke-width: 2.2; }
+
+.cadre.graphique .viseur { stroke: #8fa2bd; }
+.cadre.graphique .viseur-point { fill: #2fe0a6; stroke: var(--fond-graphe); }
+
+.cadre.graphique .graphique-note,
+.cadre.graphique .minicarte-aide { color: #7d8ea8; }
+.cadre.graphique .graphique-legende { color: #b9c7dc; }
+.cadre.graphique .leg-conforme::before { background: #2fe0a6; }
+.cadre.graphique .leg-a_verifier::before { background: #f5bb4a; }
+.cadre.graphique .leg-non_conforme::before { background: #ff6b8e; }
+
+.cadre.graphique .infobulle {
+  background: #f2f6fb; color: #0d1420;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .45);
+}
+
+/* La mini-carte suit le même fond, un ton au-dessus pour se détacher. */
+.cadre.graphique .minicarte {
+  background: #131c2b; border-color: #22304a;
+}
+.cadre.graphique .mc-trait { stroke: #6d7f99; }
+.cadre.graphique .mc-aire { fill: #6d7f99; fill-opacity: .16; }
+.cadre.graphique .minicarte-voile { background: #0d1420; opacity: .72; }
+.cadre.graphique .minicarte-fenetre {
+  border-color: #2fe0a6;
+  background-color: rgba(47, 224, 166, .10);
+}
+.cadre.graphique .poignee::before {
+  background: #2fe0a6; box-shadow: 0 0 0 2px #131c2b;
+}

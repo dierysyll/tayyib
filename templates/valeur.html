@@ -290,16 +290,33 @@
           bulle.style.left = gauche + 'px';
         }
 
-        // Molette : raccourci de la mini-carte. Les deux gestes agissent
-        // sur les mêmes bornes, sinon ils se contrediraient.
+        // Molette : raccourci de la mini-carte, sur les mêmes bornes.
+        //
+        // Deux défauts corrigés ici. La fraction se calcule sur la **zone
+        // de tracé**, pas sur toute la largeur du SVG : la marge de droite
+        // porte les prix, et l'ignorer décalait le centre du zoom vers la
+        // fin de la série — d'où l'impression que le graphique filait
+        // toujours vers la dernière période.
+        //
+        // Et le pas dépend de l'amplitude de la molette. Un facteur fixe de
+        // 0,8 par cran poussait au maximum en trois crans, ce qui rend le
+        // réglage fin impossible — surtout sur un pavé tactile, qui émet
+        // beaucoup d'événements de faible amplitude.
         svg.addEventListener('wheel', function (e) {
           e.preventDefault();
           var r = svg.getBoundingClientRect();
-          var f = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+          var gauche = r.left + (MG / L) * r.width;
+          var largeurTrace = ((L - MG - MD) / L) * r.width;
+          var f = Math.max(0, Math.min(1, (e.clientX - gauche) / largeurTrace));
+
           var centre = borne[0] + f * (borne[1] - borne[0]);
-          var largeur = (borne[1] - borne[0]) * (e.deltaY < 0 ? 0.8 : 1.25);
-          largeur = Math.max(0.04, Math.min(1, largeur));
-          var g = Math.max(0, Math.min(1 - largeur, centre - largeur / 2));
+          var pas = Math.min(Math.abs(e.deltaY), 60) / 60 * 0.16;
+          var largeur = (borne[1] - borne[0]) * (e.deltaY < 0 ? 1 - pas : 1 + pas);
+          largeur = Math.max(0.03, Math.min(1, largeur));
+
+          // On garde le point sous le curseur à sa place : c'est ce qui
+          // rend un zoom prévisible.
+          var g = Math.max(0, Math.min(1 - largeur, centre - f * largeur));
           borne = [g, g + largeur];
           majFenetre();
           dessine(tranche());
@@ -494,6 +511,41 @@
       de la rentabilité, de la valorisation ni des perspectives de la société.
       Une entreprise sans dette et sans bénéfices obtiendrait A+.
     </p>
+  {% endif %}
+
+  {% if condition %}
+    <div class="encart encart-neutre">
+      <p><strong>Ce qu'il faudrait pour que ce verdict bascule.</strong>
+      {% if condition.type == 'cours' %}
+        {{ standard.label }} divise par la capitalisation boursière, donc le
+        verdict dépend du cours.
+        {% if condition.depasse %}
+          Cette valeur deviendrait conforme sur le ratio « {{ condition.ratio | lower }} »
+          si le cours atteignait <strong>{{ condition.pivot | nombre }} {{ condition.devise }}</strong>,
+          soit {{ condition.ecart | signe }} depuis {{ condition.actuel | nombre }} {{ condition.devise }}.
+        {% else %}
+          Elle cesserait de l'être sur le ratio « {{ condition.ratio | lower }} »
+          si le cours tombait sous <strong>{{ condition.pivot | nombre }} {{ condition.devise }}</strong>,
+          soit {{ condition.ecart | signe }} depuis {{ condition.actuel | nombre }} {{ condition.devise }}.
+        {% endif %}
+      {% else %}
+        {{ standard.label }} divise par le total du bilan : aucun mouvement de
+        cours ne change ce verdict.
+        {% if condition.depasse %}
+          Il faudrait ramener « {{ condition.ratio | lower }} » à
+          <strong>{{ condition.pivot | montant }} {{ condition.devise }}</strong>
+          contre {{ condition.actuel | montant }} aujourd'hui.
+        {% else %}
+          Le poste « {{ condition.ratio | lower }} » pourrait monter jusqu'à
+          <strong>{{ condition.pivot | montant }} {{ condition.devise }}</strong>
+          contre {{ condition.actuel | montant }} aujourd'hui avant de basculer.
+        {% endif %}
+      {% endif %}
+      </p>
+      <p>C'est une condition, pas une échéance : nous ne prédisons ni les cours
+      ni les décisions d'endettement. <a href="{{ url_for('suivi') }}">Suivre cette
+      valeur</a> pour être averti si le verdict change.</p>
+    </div>
   {% endif %}
 
   <div class="onglets" role="tablist">

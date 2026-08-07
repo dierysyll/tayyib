@@ -217,7 +217,7 @@
   {% endif %}
 
   {% if hausses or baisses %}
-    <h2 class="section">Mouvements de la semaine</h2>
+    <h2 class="section">Mouvements de la séance</h2>
     <div class="grille-analyses">
       {% for titre, liste, icone_nom, teinte in [
            ('Plus fortes hausses', hausses, 'hausse', 'i-vert'),
@@ -226,7 +226,7 @@
           <div class="carte-tete">
             <div>
               <h3 class="carte-titre">{{ titre }}</h3>
-              <p class="carte-sous">Sur le dernier pas hebdomadaire de la série de cours.</p>
+              <p class="carte-sous">Variation de la dernière séance de cotation.</p>
             </div>
             <span class="carte-icone {{ teinte }}">{{ icone(icone_nom) }}</span>
           </div>

@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% from "icones.html" import icone %}
+{% block titre %}Valeurs suivies{% endblock %}
+{% block description %}Surveillez des valeurs et voyez à quelle condition exacte elles deviendraient conformes — ou cesseraient de l'être.{% endblock %}
+
+{% block contenu %}
+<main class="page page-etroite">
+
+  <h1 class="titre-page">Valeurs suivies</h1>
+  <p class="chapeau">
+    Choisissez les valeurs que vous surveillez. Tayyib retient le verdict au
+    moment où vous les ajoutez et vous signale tout basculement, puis indique
+    pour chacune <strong>à quelle condition exacte</strong> elle passerait de
+    l'autre côté du seuil.
+  </p>
+
+  <div class="encart">
+    <p><strong>Une condition, pas une échéance.</strong>
+    On attend souvent d'un screener qu'il annonce <em>quand</em> une action
+    deviendra conforme. Cela supposerait de prédire un cours de Bourse ou la
+    politique d'endettement d'une entreprise : personne ne sait faire ni l'un
+    ni l'autre, et une date affichée avec assurance sur un outil de screening
+    religieux serait pire qu'inutile — quelqu'un achèterait en s'y fiant.</p>
+    <p>La question <em>à quelle condition</em>, elle, a une réponse exacte et
+    ne demande aucune prédiction. Les standards posent
+    <code>montant ÷ dénominateur ≤ seuil</code> : on connaît le montant et le
+    seuil, on résout. Pour AAOIFI, Dow Jones et S&amp;P, qui divisent par la
+    capitalisation, cela donne le <strong>cours pivot</strong>. Pour MSCI,
+    FTSE et SC Malaisie, qui divisent par le bilan, cela donne la
+    <strong>dette admissible</strong> — et aucun mouvement de cours n'y
+    changera quoi que ce soit.</p>
+  </div>
+
+  <div class="calc">
+    <div class="calc-champs">
+      <div class="champ" style="flex:1 1 320px">
+        <label for="ajout">Ajouter une valeur</label>
+        <select id="ajout">
+          <option value="">Chargement de l'univers…</option>
+        </select>
+      </div>
+      <div class="champ" style="flex:0 0 auto">
+        <label>&nbsp;</label>
+        <button type="button" class="bouton" id="ajouter">Suivre</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="outils" style="margin-top:16px">
+    <form method="get" action="/suivi">
+      <select name="standard" class="selecteur" onchange="this.form.submit()">
+        {% for sid, std in standards.items() %}
+          <option value="{{ sid }}" {% if sid == standard.id %}selected{% endif %}>Standard : {{ std.label }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <button type="button" class="lien-bouton" id="vider">Vider la liste</button>
+  </div>
+
+  <div id="alertes"></div>
+
+  <div id="liste">
+    <div class="cadre"><p class="vide" id="vide">
+      Aucune valeur suivie. Ajoutez-en une ci-dessus.
+    </p></div>
+  </div>
+
+  <div class="encart encart-neutre">
+    <p><strong>Rien ne quitte votre navigateur.</strong>
+    La liste et les verdicts de référence sont enregistrés en local, sur cet
+    appareil. Il n'y a ni compte, ni inscription, ni envoi au serveur — et
+    donc pas non plus de courriel d'alerte : le signalement s'affiche quand
+    vous revenez sur cette page.</p>
+  </div>
+
+</main>
+
+<script>
+(function () {
+  var CLE = 'tayyib.suivi.v1';
+  var STANDARD = {{ standard.id | tojson }};
+
+  var elAjout = document.getElementById('ajout'),
+      elListe = document.getElementById('liste'),
+      elAlertes = document.getElementById('alertes');
+
+  var LIBELLES = {conforme: 'Conforme', a_verifier: 'À vérifier', non_conforme: 'Non conforme'};
+
+  function lire() {
+    try { return JSON.parse(localStorage.getItem(CLE)) || []; }
+    catch (e) { return []; }
+  }
+  function ecrire(v) {
+    try { localStorage.setItem(CLE, JSON.stringify(v)); } catch (e) {}
+  }
+  function nb(v, d) {
+    return v.toLocaleString('fr-FR', {minimumFractionDigits: d, maximumFractionDigits: d});
+  }
+
+  var suivies = lire();
+
+  // --- Univers, pour la liste déroulante ---------------------------------
+  fetch('/api/univers.json?standard=' + STANDARD)
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      elAjout.innerHTML = '<option value="">Choisir une valeur…</option>';
+      d.valeurs.sort(function (a, b) { return a.nom.localeCompare(b.nom, 'fr'); })
+        .forEach(function (v) {
+          var o = document.createElement('option');
+          o.value = v.ticker;
+          o.textContent = v.nom + ' (' + v.ticker + ')';
+          elAjout.appendChild(o);
+        });
+    })
+    .catch(function () { elAjout.innerHTML = '<option value="">Univers indisponible</option>'; });
+
+  document.getElementById('ajouter').addEventListener('click', function () {
+    var t = elAjout.value;
+    if (!t || suivies.some(function (s) { return s.ticker === t; })) return;
+    // Le verdict de référence est enregistré à l'ajout : c'est lui qui
+    // sert de point de comparaison pour signaler un basculement.
+    suivies.push({ticker: t, depuis: new Date().toISOString().slice(0, 10), verdict: null});
+    ecrire(suivies);
+    charge();
+  });
+
+  document.getElementById('vider').addEventListener('click', function () {
+    if (!suivies.length) return;
+    suivies = []; ecrire(suivies); charge();
+  });
+
+  function charge() {
+    if (!suivies.length) {
+      elAlertes.innerHTML = '';
+      elListe.innerHTML = '<div class="cadre"><p class="vide">Aucune valeur suivie. Ajoutez-en une ci-dessus.</p></div>';
+      return;
+    }
+    var tickers = suivies.map(function (s) { return s.ticker; }).join(',');
+    fetch('/api/bascule.json?standard=' + STANDARD + '&tickers=' + encodeURIComponent(tickers))
+      .then(function (r) { return r.json(); })
+      .then(rend)
+      .catch(function () {
+        elListe.innerHTML = '<div class="cadre"><p class="vide">Données indisponibles.</p></div>';
+      });
+  }
+
+  function rend(data) {
+    var changements = [];
+
+    var lignes = data.valeurs.map(function (v) {
+      var suivi = suivies.filter(function (s) { return s.ticker === v.ticker; })[0];
+      // Premier passage : on fige le verdict de référence sans crier au
+      // changement — on ne peut pas signaler un écart avec rien.
+      if (suivi && suivi.verdict === null) { suivi.verdict = v.verdict; }
+      else if (suivi && suivi.verdict !== v.verdict) {
+        changements.push({v: v, avant: suivi.verdict});
+      }
+
+      var cond = v.condition;
+      var texteCond;
+      if (!cond) {
+        texteCond = v.verdict === 'non_conforme'
+          ? 'Activité exclue : aucun ratio ne la rendrait conforme.'
+          : 'Condition non calculable — donnée de bilan manquante.';
+      } else if (cond.type === 'cours') {
+        texteCond = (cond.depasse ? 'Deviendrait conforme si le cours atteignait ' : 'Cesserait de l\'être si le cours tombait sous ') +
+          '<strong>' + nb(cond.pivot, 2) + ' ' + (cond.devise || '') + '</strong>' +
+          ' <span class="ticker">(' + (cond.ecart >= 0 ? '+' : '−') + nb(Math.abs(cond.ecart) * 100, 1) + ' % depuis ' + nb(cond.actuel, 2) + ')</span>' +
+          '<br><span class="ticker">sur le ratio « ' + cond.ratio + ' »</span>';
+      } else {
+        texteCond = (cond.depasse ? 'Deviendrait conforme si la dette descendait à ' : 'Cesserait de l\'être si la dette dépassait ') +
+          '<strong>' + nb(cond.pivot / 1e9, 1) + ' Md</strong>' +
+          ' <span class="ticker">(contre ' + nb(cond.actuel / 1e9, 1) + ' Md aujourd\'hui)</span>' +
+          '<br><span class="ticker">sur le ratio « ' + cond.ratio + ' » — aucun mouvement de cours n\'y change rien</span>';
+      }
+
+      return '<tr>' +
+        '<td><a class="nom-valeur" href="/valeur/' + v.ticker + '?standard=' + STANDARD + '">' + v.nom + '</a>' +
+        '<div class="ticker">' + v.ticker + (suivi ? ' · suivi depuis le ' + suivi.depuis.split('-').reverse().join('/') : '') + '</div></td>' +
+        '<td><span class="verdict v-' + v.verdict + '">' + LIBELLES[v.verdict] + '</span></td>' +
+        '<td>' + (v.note ? '<span class="note n-' + v.note.famille + '">' + v.note.lettre + '</span>' : '<span class="note-absente">—</span>') + '</td>' +
+        '<td style="font-size:13px;line-height:1.5">' + texteCond + '</td>' +
+        '<td class="a-droite"><button type="button" class="lien-bouton" data-retirer="' + v.ticker + '">Retirer</button></td>' +
+        '</tr>';
+    }).join('');
+
+    elListe.innerHTML =
+      '<div class="cadre"><div class="defilement"><table><thead><tr>' +
+      '<th>Valeur</th><th>Verdict ' + data.standard + '</th><th>Marge</th>' +
+      '<th>Condition de bascule</th><th></th>' +
+      '</tr></thead><tbody>' + lignes + '</tbody></table></div></div>';
+
+    elAlertes.innerHTML = changements.map(function (c) {
+      var entrant = c.v.verdict === 'conforme';
+      return '<div class="encart" style="border-left:4px solid var(--' + (entrant ? 'vert' : 'rouge') + ')">' +
+        '<p><strong>' + c.v.nom + ' a changé de verdict.</strong> ' +
+        'Cette valeur était <em>' + LIBELLES[c.avant].toLowerCase() + '</em> quand vous l\'avez ajoutée, ' +
+        'elle est maintenant <em>' + LIBELLES[c.v.verdict].toLowerCase() + '</em> selon ' + data.standard + '.</p></div>';
+    }).join('');
+
+    ecrire(suivies);
+
+    elListe.querySelectorAll('[data-retirer]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        suivies = suivies.filter(function (s) { return s.ticker !== b.dataset.retirer; });
+        ecrire(suivies); charge();
+      });
+    });
+  }
+
+  charge();
+})();
+</script>
+{% endblock %}

@@ -82,14 +82,13 @@ def _nom_fichier(ticker):
 
 
 def _variation(cours):
-    """La variation du cours sur le dernier pas de la série.
+    """Repli : la variation sur le dernier pas de la série hebdomadaire.
 
-    Calculée ici, à l'écriture de l'index, plutôt que collectée : la série
-    hebdomadaire est déjà sur disque pour chaque valeur, et la relire coûte
-    zéro requête. Yahoo expose bien une variation du jour, mais la prendre
-    supposerait de recollecter mille valeurs pour un chiffre qu'on peut
-    déduire. C'est donc une variation **hebdomadaire**, et l'interface le
-    dit — annoncer « aujourd'hui » un écart d'une semaine serait faux.
+    La collecte récupère désormais la variation de la séance auprès de
+    Yahoo, qui est la bonne grandeur. Ce calcul ne sert plus qu'aux valeurs
+    dont la fiche est antérieure à ce changement, ou dont Yahoo ne publie
+    pas la séance — mieux vaut un écart hebdomadaire qu'une case vide, et
+    la différence est sans conséquence sur le classement des mouvements.
     """
     if not cours or len(cours) < 2:
         return None
