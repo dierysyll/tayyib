@@ -565,7 +565,7 @@
             <div>
               <div class="ratio-nom">{{ r.label }}</div>
               <div class="ratio-detail num">
-                {% if r.montant is not none %}{{ r.montant | montant }} rapporté à la {{ standard.denominator_label }}
+                {% if r.montant is not none %}{{ r.montant | montant }} rapporté {{ standard.denominator_complement }}
                 {% else %}Ligne absente du bilan publié{% endif %}
               </div>
             </div>
@@ -588,10 +588,20 @@
       {% endfor %}
     </div>
     {% if societe.bilan_date %}
-      <p class="pied-liens" style="margin-top:10px">
+      <p class="provenance">
         Montants issus du bilan arrêté au {{ societe.bilan_date | date_fr }}.
-        Capitalisation au {{ fetched_at | date_fr }}.
+        {%- if societe.bilan_plan %}
+          Comptes lus dans les états financiers déposés par la société
+          {%- if societe.bilan_source %} (<a href="{{ societe.bilan_source }}"
+            rel="noopener">le document</a>){% endif %}, au plan
+          {{ societe.bilan_plan }}.
+        {%- else %}
+          Capitalisation au {{ fetched_at | date_fr }}.
+        {%- endif %}
       </p>
+      {% if societe.bilan_reserve %}
+        <p class="note">{{ societe.bilan_reserve }}</p>
+      {% endif %}
     {% endif %}
   {% endif %}
 

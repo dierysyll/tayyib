@@ -222,7 +222,7 @@
         <div class="carte-tete">
           <div>
             <h3 class="carte-titre">{{ r.standard.label }}</h3>
-            <p class="carte-sous">Rapporté à la {{ r.standard.denominator_label }}.</p>
+            <p class="carte-sous">Rapporté {{ r.standard.denominator_complement }}.</p>
           </div>
           <span class="carte-icone {% if r.standard.id == standard.id %}i-vert{% else %}i-europe{% endif %}">
             {{ (r.part.conforme * 100) | round | int }}%

@@ -11,9 +11,11 @@ premier manque — Euronext Paris — et couvre aujourd'hui **29 places** sur
 quatre continents. Paris reste la place de référence.
 
 Parmi elles, la **BRVM d'Abidjan**, place commune aux huit pays de l'UEMOA :
-absente de Yahoo Finance, elle est collectée directement à sa source. C'est
-la seule place où un épargnant sénégalais ou ivoirien achète dans sa propre
-monnaie, et aucun autre screener halal ne la couvre.
+absente de Yahoo Finance, elle est collectée directement à sa source — les
+cours sur la page de cotation, les comptes dans les états financiers que
+chaque société y dépose. C'est la seule place où un épargnant sénégalais ou
+ivoirien achète dans sa propre monnaie, et aucun autre screener halal ne la
+couvre.
 
 ## Ce que fait l'application
 
@@ -69,6 +71,16 @@ synthèse annonce 4,05 Md€ de trésorerie pour L'Oréal, quand le bilan au
 tout ce qui entre dans les ratios — les trois montants viennent du même
 arrêté comptable, et cet arrêté est affiché.
 
+**Une colonne choisie, pas devinée.** Les bilans de la BRVM arrivent en PDF,
+et l'actif SYSCOHADA s'y présente en trois colonnes : brut, amortissements,
+net. Chez Erium, 25,4 Md, 10,8 Md et 14,6 Md sur la même ligne — se tromper
+de colonne surestimerait l'actif de 74 %, donc sous-estimerait tous les
+ratios, donc déclarerait conformes des sociétés qui ne le sont pas.
+`data/bilans.py` ne devine pas : il retient la colonne qui **égale le total
+du passif**, et refuse le document quand aucune n'y parvient. La même
+vérification attrape une page mal appariée, une unité mal lue ou un nombre
+mal découpé.
+
 **Bloqué n'est pas absent.** Yahoo limite le débit. Un symbole qu'on n'a pas
 pu lire et un symbole qui n'existe pas produisent le même silence, mais
 appellent des réponses opposées : le second se corrige, le premier se
@@ -119,6 +131,7 @@ data/
   universe.py           les places de marché et leurs valeurs
   yahoo.py              collecte (bilan daté + capitalisation + actualités)
   brvm.py               collecte directe de la cote d'Abidjan
+  bilans.py             lecture des bilans SYSCOHADA et IFRS en PDF
   presse.py             flux RSS francophones, en trois rubriques
   fx.py                 taux de change, cours de l'or et de l'argent
   cache.py              cache disque en deux étages
@@ -157,6 +170,7 @@ titres, de sorte que le site sert un univers qui grandit pendant la collecte.
 
 ```bash
 .venv/bin/python refresh.py --brvm                 # seulement la cote d'Abidjan
+.venv/bin/python refresh.py --brvm-bilans          # + relire les états financiers
 .venv/bin/python refresh.py --places paris,riyad   # une ou plusieurs places
 .venv/bin/python refresh.py --force                # tout redemander
 .venv/bin/python refresh.py --actus                # seulement le fil d'actualité
@@ -167,10 +181,15 @@ titres, de sorte que le site sert un univers qui grandit pendant la collecte.
 
 - Le **filtre des 5 %** n'est pas calculable (voir plus haut). C'est la
   principale limite, et elle est structurelle.
-- Sur la **BRVM**, seuls les **cours** sont collectés. Les états financiers
-  existent — la BRVM publie les PDF au plan SYSCOHADA — mais l'extracteur
-  reste à écrire. En attendant, le filtre sectoriel s'applique pleinement
-  (les seize banques de la cote sont exclues sans bilan), et le reste est
+- Sur la **BRVM**, la **capitalisation boursière** est inconnue : la source
+  ne publie aucun nombre d'actions à jour, celui de ses fiches émetteurs
+  datant de 2015. Les trois standards qui divisent par elle — AAOIFI, Dow
+  Jones, S&P Shariah — ne peuvent donc pas conclure sur cette place, là où
+  MSCI Islamic, FTSE Shariah et SC Malaisie tranchent normalement.
+- Les **bilans de la BRVM** sont lus dans les PDF déposés par les émetteurs,
+  et 23 des 28 sociétés que le secteur ne tranche pas d'emblée sont
+  couvertes. Les cinq autres publient sous une forme que `data/bilans.py`
+  refuse de lire plutôt que d'interpréter de travers ; elles restent
   « à vérifier ».
 - **Casablanca** n'est toujours pas couverte, et la source le dit mal : elle
   répond « Too Many Requests » là où elle devrait répondre « symbole

@@ -187,13 +187,52 @@ def collecte_valeurs(places, force=False):
     return len(a_faire) - len(bloques) - len(inconnus), bloques, inconnus
 
 
-def collecte_brvm():
+# Ce que la lecture d'un bilan renseigne, et qu'une collecte de cours ne
+# doit surtout pas effacer : les comptes ne se republient qu'une fois l'an.
+CHAMPS_BILAN = (
+    "total_debt", "cash_and_investments", "receivables", "total_assets",
+    "bilan_date", "bilan_plan", "bilan_reserve", "bilan_source",
+)
+
+
+def _bilan_brvm(societe, relire):
+    """Attache les comptes à une valeur d'Abidjan.
+
+    Relus à la source si on le demande, repris du cache sinon. Un échec de
+    lecture fait aussi retomber sur le cache : perdre un bilan déjà obtenu
+    parce que la source a hoqueté aujourd'hui serait une régression que
+    l'utilisateur verrait passer.
+    """
+    symbole = societe["ticker"].removesuffix(brvm.SUFFIXE)
+    if relire:
+        try:
+            lu = brvm.bilan(symbole)
+        except Exception as exc:
+            print(f"  {symbole} : lecture impossible ({type(exc).__name__})")
+            lu = None
+        if lu:
+            societe.update(lu)
+            return True
+
+    ancien = cache.detail(societe["ticker"]) or {}
+    for champ in CHAMPS_BILAN:
+        if ancien.get(champ) is not None:
+            societe[champ] = ancien[champ]
+    return False
+
+
+def collecte_brvm(avec_bilans=False):
     """La cote de la BRVM, en une requête.
 
     Contrairement à Yahoo, la source publie sa cote entière sur une page :
     47 sociétés pour un aller-retour. On écrit les détails comme pour les
     autres places, de sorte que l'index se construit sans traitement
     particulier ensuite.
+
+    Les **états financiers**, eux, se demandent fiche par fiche et ne
+    changent qu'une fois l'an : ils ne sont relus que sur demande
+    explicite, et seulement pour les sociétés dont le secteur n'a pas
+    déjà tranché le verdict.
     """
     try:
         societes = brvm.societes()
@@ -203,17 +242,21 @@ def collecte_brvm():
         return 0
 
     declares = set(brvm.tickers())
-    nouveaux = []
+    nouveaux, lus = [], 0
     for societe in societes:
         societe["place"] = "brvm"
-        # Pas de capitalisation publiée : la conversion en euros n'a pas
-        # d'objet tant que les états financiers ne sont pas lus.
+        # Pas de nombre d'actions publié à jour, donc pas de capitalisation :
+        # les standards qui divisent par elle ne pourront pas conclure.
         societe["market_cap_eur"] = None
+        if _bilan_brvm(societe, avec_bilans):
+            lus += 1
         cache.save_detail(societe)
         if societe["ticker"] not in declares:
             nouveaux.append(societe["ticker"])
 
     print(f"BRVM : {len(societes)} sociétés collectées")
+    if avec_bilans:
+        print(f"  {lus}/{len(brvm.FICHES)} bilans lus à la source")
     if nouveaux:
         print(f"  {len(nouveaux)} symboles nouveaux à déclarer dans data/brvm.py : "
               f"{', '.join(nouveaux)}")
@@ -298,6 +341,8 @@ def main():
                          help="réécrit seulement l'index depuis le disque")
     parseur.add_argument("--brvm", action="store_true",
                          help="collecte seulement la cote de la BRVM")
+    parseur.add_argument("--brvm-bilans", action="store_true",
+                         help="relit aussi les états financiers de la BRVM")
     args = parseur.parse_args()
 
     if args.index:
@@ -305,8 +350,8 @@ def main():
         print(f"{_ecrire_index(taux, avec_metaux=True)} valeurs réécrites dans l'index")
         return 0
 
-    if args.brvm:
-        n = collecte_brvm()
+    if args.brvm or args.brvm_bilans:
+        n = collecte_brvm(avec_bilans=args.brvm_bilans)
         if n:
             print(f"{_ecrire_index(fx.collecte(_devises()))} valeurs dans l'index")
         return 0 if n else 1

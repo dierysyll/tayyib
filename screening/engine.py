@@ -133,13 +133,13 @@ def evaluate(company, standard_id=standards.DEFAULT_STANDARD):
         resultat["verdict"] = NON_CONFORME
         resultat["raison"] = (
             f"Seuil dépassé — {', '.join(depasses)} "
-            f"(rapporté à la {std['denominator_label']})."
+            f"(rapporté {std['denominator_complement']})."
         )
     elif not _denominateur(company, std):
         resultat["verdict"] = A_VERIFIER
         resultat["raison"] = (
-            f"La {std['denominator_label']} est indisponible : aucun ratio "
-            "n'a pu être calculé."
+            f"Dénominateur indisponible — {std['denominator_label']} : "
+            "aucun ratio n'a pu être calculé."
         )
     elif manquants:
         resultat["verdict"] = A_VERIFIER

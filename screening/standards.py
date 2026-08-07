@@ -13,7 +13,9 @@ verdict affiche le standard qui l'a produit.
 
 Chaque standard décrit :
   - `denominator` : à quoi on rapporte les montants ("market_cap" ou
-    "total_assets") ;
+    "total_assets"), sous deux formes : le libellé nu pour les tableaux,
+    et le complément tout fait pour les phrases — « à la » capitalisation,
+    mais « au » total du bilan, et aucune règle simple ne s'en déduit ;
   - `ratios`      : les seuils, exprimés en fraction (0.30 = 30 %) ;
   - `note`        : les limites de notre implémentation, affichées à
     l'utilisateur. On ne cache pas les approximations.
@@ -31,6 +33,7 @@ STANDARDS = {
         "full": "AAOIFI — Norme Charia n° 21",
         "denominator": "market_cap",
         "denominator_label": "capitalisation boursière",
+        "denominator_complement": "à la capitalisation boursière",
         "ratios": {
             "debt": 0.30,
             "liquidity": 0.30,
@@ -47,6 +50,7 @@ STANDARDS = {
         "full": "Dow Jones Islamic Market (DJIM)",
         "denominator": "market_cap",
         "denominator_label": "capitalisation boursière",
+        "denominator_complement": "à la capitalisation boursière",
         "ratios": {
             "debt": 1 / 3,
             "liquidity": 1 / 3,
@@ -66,6 +70,7 @@ STANDARDS = {
         "full": "MSCI Islamic Index Series",
         "denominator": "total_assets",
         "denominator_label": "total du bilan",
+        "denominator_complement": "au total du bilan",
         "ratios": {
             "debt": 1 / 3,
             "liquidity": 1 / 3,
@@ -84,6 +89,7 @@ STANDARDS = {
         "full": "S&P Dow Jones Shariah Indices",
         "denominator": "market_cap",
         "denominator_label": "capitalisation boursière",
+        "denominator_complement": "à la capitalisation boursière",
         "ratios": {
             "debt": 0.33,
             "liquidity": 0.33,
@@ -103,6 +109,7 @@ STANDARDS = {
         "full": "FTSE Shariah Global Equity Index Series",
         "denominator": "total_assets",
         "denominator_label": "total du bilan",
+        "denominator_complement": "au total du bilan",
         "ratios": {
             "debt": 1 / 3,
             "liquidity": 1 / 3,
@@ -121,6 +128,7 @@ STANDARDS = {
         "full": "Securities Commission Malaysia — Shariah Screening",
         "denominator": "total_assets",
         "denominator_label": "total du bilan",
+        "denominator_complement": "au total du bilan",
         "ratios": {
             "debt": 0.33,
             "liquidity": 0.33,

@@ -1082,6 +1082,13 @@ td.depasse { color: var(--rouge); }
 .pied-liens { font-size: 13px; color: var(--texte-faible); margin: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .pied-liens a { color: var(--texte-doux); }
 
+/* La provenance des comptes est une phrase, pas une rangée de liens.
+   `.pied-liens` est en flex : chaque mot autour du lien y devient un
+   élément de la grille, et les parenthèses se détachent de ce qu'elles
+   entourent. */
+.provenance { font-size: 13px; color: var(--texte-faible); margin: 10px 0 0; line-height: 1.6; max-width: 82ch; }
+.provenance a { color: var(--texte-doux); }
+
 .vide { padding: 52px 20px; text-align: center; color: var(--texte-doux); }
 
 

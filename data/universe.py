@@ -471,9 +471,13 @@ PLACES = {
         "region": "monde-musulman", "indice": "BRVM Composite · BRVM 30",
         "source": "brvm",
         "note": "Place absente de Yahoo Finance : nous la collectons directement "
-                "auprès de la BRVM. Les cours sont à jour ; les états financiers "
-                "ne sont pas encore lus, si bien que les valeurs dont l'activité "
-                "ne tranche pas restent « à vérifier ».",
+                "auprès de la BRVM — les cours sur sa page de cotation, les "
+                "comptes dans les états financiers que chaque société y dépose. "
+                "Faute d'un nombre d'actions publié à jour, la capitalisation "
+                "boursière reste inconnue : les standards qui divisent par elle "
+                "— AAOIFI, Dow Jones, S&P Shariah — ne peuvent pas conclure ici, "
+                "là où MSCI Islamic, FTSE Shariah et SC Malaisie, qui rapportent "
+                "les montants au total du bilan, tranchent normalement.",
         "valeurs": brvm.tickers(),
     },
     "riyad": {

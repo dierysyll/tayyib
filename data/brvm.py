@@ -19,18 +19,25 @@ et produit des sociétés au même format que `data/yahoo.py`, de sorte que
 le moteur de screening, le cache et l'interface ne changent pas d'un
 caractère.
 
-Ce que ce module ne fait pas encore
------------------------------------
-Il ne lit que les **cours**. Les états financiers existent — la BRVM
-publie les PDF au plan SYSCOHADA, avec des codes de poste normalisés qui
-les rendent extractibles — mais c'est un autre chantier. En attendant,
-les valeurs arrivent sans bilan, donc sans ratios calculables.
+Deux collectes, à deux rythmes
+------------------------------
+Les **cours** viennent de la page de cotation : une requête pour la cote
+entière, et elle vaut d'être rejouée chaque jour.
 
-Ce n'est pas un demi-produit : le **filtre sectoriel**, lui, s'applique
-pleinement. Les seize banques de la cote sont exclues sans qu'aucun bilan
-soit nécessaire, comme la loterie du Bénin, la brasserie et le
-cigarettier. Pour le reste, le verdict est « à vérifier », et c'est la
-réponse honnête tant que les comptes ne sont pas lus.
+Les **états financiers** viennent d'ailleurs — une fiche de documents par
+société, où l'émetteur dépose ses comptes en PDF. Ils ne changent qu'une
+fois l'an, et les redemander quotidiennement serait aussi inutile que
+malpoli envers la source. `data/bilans.py` en tire les quatre grandeurs
+du screening ; ce module se charge de trouver le bon document.
+
+Ce que la source ne donne pas
+-----------------------------
+Aucun **nombre d'actions** à jour : les fiches émetteurs en publient un,
+arrêté en 2015, qu'il serait imprudent d'utiliser. Sans lui, pas de
+capitalisation boursière, donc pas de verdict selon les standards qui
+divisent par elle — AAOIFI, Dow Jones, S&P Shariah. Les trois autres —
+MSCI Islamic, FTSE Shariah, SC Malaisie — rapportent les montants au
+total du bilan et concluent normalement.
 
 Sur la classification sectorielle
 ---------------------------------
@@ -44,10 +51,14 @@ même règle qu'une banque française.
 """
 
 import html
+import os
 import re
 import urllib.request
 
+from data import bilans, cache
+
 COTATIONS = "https://www.brvm.org/fr/cours-actions/0"
+FICHE = "https://www.brvm.org/fr/rapports-societe-cotes/"
 
 ENTETES = {
     "User-Agent": "Mozilla/5.0 (compatible; Tayyib/1.0; +https://tayyib.app)",
@@ -125,7 +136,56 @@ SOCIETES = {
     "NEIC":  ("Communication Services", "Publishing", "Côte d'Ivoire"),
 }
 
+# Symbole → (fiche de documents sur brvm.org, motif attendu dans l'intitulé).
+#
+# Le motif n'est pas une précaution théorique. La BRVM dépose parfois un
+# document sur la mauvaise fiche : celle de CFAO Motors porte des états
+# financiers de Tractafric, qui est une autre société de la cote. Prendre
+# le document le plus récent d'une fiche attribuerait le bilan de l'une à
+# l'autre — une erreur invisible et grave. L'intitulé fait donc foi, et
+# un document qui ne nomme pas la société attendue est ignoré.
+#
+# Les banques et les autres activités que le filtre sectoriel écarte n'y
+# figurent pas : leur verdict est acquis sans comptes, et les demander
+# serait solliciter la source pour rien.
+FICHES = {
+    "SNTS":  ("sonatel", r"sonatel"),
+    "ORAC":  ("orange-ci", r"orange"),
+    "ONTBF": ("onatel-bf", r"onatel"),
+    "CIEC":  ("cie-ci", r"\bcie\b"),
+    "SDCC":  ("sodeci", r"sodeci"),
+    "PALC":  ("palm-ci", r"\bpalm\b"),
+    "SOGC":  ("sogb", r"\bsogb\b"),
+    "SPHC":  ("saph-ci", r"\bsaph\b"),
+    "SCRC":  ("sucrivoire", r"sucrivoire"),
+    "SICC":  ("sicor", r"sicor"),
+    "NTLC":  ("nestle-ci", r"nestle"),
+    "UNLC":  ("unilever-ci", r"unilever"),
+    "SHEC":  ("vivo-energy-ci", r"vivo"),
+    "TTLC":  ("total", r"marketing[ _]ci\b"),
+    "TTLS":  ("total-senegal-sa", r"marketing[ _]sn\b|total[ _]senegal"),
+    "SIVC":  ("air-liquide-ci", r"erium|air[ _]liquide"),
+    "CABC":  ("sicable", r"sicable"),
+    "FTSC":  ("filtisac-ci", r"filtisac"),
+    "SEMC":  ("crown-siem-ci", r"eviosys|siem"),
+    "SMBC":  ("smb", r"\bsmb\b"),
+    "UNXC":  ("uniwax-ci", r"uniwax"),
+    "STAC":  ("setao-ci", r"setao"),
+    "BNBC":  ("bernabe-ci", r"bernabe"),
+    "CFAC":  ("cfao-motors-ci", r"cfao"),
+    "PRSC":  ("tractafric-ci", r"tractafric"),
+    "SDSC":  ("bollore-transport-logistics", r"africa[ _]global[ _]logistics|\bagl\b|bollore"),
+    "ABJC":  ("servair-abidjan-ci", r"servair"),
+    "NEIC":  ("nei-ceda-ci", r"nei[ _]?ceda"),
+}
+
 BALISES = re.compile(r"<[^>]+>")
+ETATS_FINANCIERS = re.compile(r"[ée]tats?\s+financiers", re.I)
+EXERCICE = re.compile(r"exercices?\s*(?:\d{4}\s*(?:à|-|a)\s*)?(\d{4})", re.I)
+
+# Les PDF ne changent qu'une fois l'an : les garder sur disque évite de
+# redemander vingt méga-octets à la source à chaque collecte.
+DOSSIER_PDF = os.path.join(cache.CACHE_DIR, "brvm")
 
 
 def _nombre(texte):
@@ -231,3 +291,92 @@ def societes():
 def tickers():
     """Les symboles déclarés, suffixés — l'univers que nous prétendons couvrir."""
     return [s + SUFFIXE for s in SOCIETES]
+
+
+def _sans_accents(texte):
+    """Un intitulé comparable : sans accents, sans casse, sans ponctuation.
+
+    Les émetteurs écrivent « CÔTE D'IVOIRE », « Côte d'Ivoire » ou
+    « COTE D IVOIRE » selon l'humeur du jour ; le motif attendu ne doit
+    pas en dépendre.
+    """
+    table = str.maketrans("àâäçéèêëîïôöùûüÀÂÄÇÉÈÊËÎÏÔÖÙÛÜ",
+                          "aaaceeeeiioouuuAAACEEEEIIOOUUU")
+    return re.sub(r"[^a-z0-9]+", " ", texte.translate(table).lower())
+
+
+def _documents(slug):
+    """Les états financiers déposés sur une fiche, du plus récent au plus ancien.
+
+    Chaque entrée est (année de l'exercice, intitulé normalisé, adresse).
+    Les rapports d'activité, communiqués et rapports RSE sont écartés :
+    seuls les états financiers portent un bilan.
+    """
+    requete = urllib.request.Request(FICHE + slug, headers=ENTETES)
+    with urllib.request.urlopen(requete, timeout=30) as reponse:
+        page = reponse.read().decode("utf-8", "ignore")
+
+    trouves = []
+    for tr in re.findall(r"<tr.*?</tr>", page[page.find("<body"):], re.S):
+        lien = re.search(r'href="([^"]*\.pdf[^"]*)"', tr, re.I)
+        if not lien:
+            continue
+        intitule = re.sub(r"\s+", " ", html.unescape(BALISES.sub(" ", tr))).strip()
+        if not ETATS_FINANCIERS.search(intitule):
+            continue
+        adresse = html.unescape(lien.group(1))
+        repere = _sans_accents(intitule + " " + adresse.replace("_", " "))
+        annees = EXERCICE.findall(repere)
+        if not annees:
+            continue
+        trouves.append((int(annees[0]), repere, adresse))
+    return sorted(trouves, reverse=True)
+
+
+def _telecharger(adresse):
+    """Le PDF, depuis le disque s'il y est déjà, depuis la source sinon."""
+    os.makedirs(DOSSIER_PDF, exist_ok=True)
+    chemin = os.path.join(DOSSIER_PDF, adresse.rsplit("/", 1)[-1][:120])
+    if os.path.exists(chemin):
+        with open(chemin, "rb") as fichier:
+            return fichier.read()
+
+    requete = urllib.request.Request(adresse, headers=ENTETES)
+    with urllib.request.urlopen(requete, timeout=120) as reponse:
+        contenu = reponse.read()
+    with open(chemin, "wb") as fichier:
+        fichier.write(contenu)
+    return contenu
+
+
+def bilan(symbole):
+    """Le dernier bilan publié par une société de la cote, ou None.
+
+    On essaie les documents du plus récent au plus ancien, et l'on
+    s'arrête au premier dont `data/bilans.py` accepte de lire le bilan :
+    la BRVM publie sous l'intitulé « états financiers » des communiqués
+    de résultats qui n'en contiennent aucun, et il serait dommage de
+    renoncer à l'exercice précédent pour cette raison.
+    """
+    fiche = FICHES.get(symbole)
+    if not fiche:
+        return None
+    slug, motif = fiche
+
+    for annee, repere, adresse in _documents(slug):
+        if not re.search(motif, repere):
+            continue
+        contenu = _telecharger(adresse)
+        try:
+            lu = bilans.lire(contenu, exercice=annee)
+        except Exception:
+            # Un PDF illisible n'est pas une panne : on passe au suivant.
+            continue
+        # Un total d'actif sans aucun poste ne permet de calculer aucun
+        # ratio. Autant continuer de chercher : mieux vaut le bilan de
+        # l'an dernier, complet, qu'un total isolé de cette année.
+        if lu and any(lu[cle] is not None for cle in
+                      ("total_debt", "cash_and_investments", "receivables")):
+            lu["bilan_source"] = adresse
+            return lu
+    return None
