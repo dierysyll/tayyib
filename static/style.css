@@ -1155,6 +1155,54 @@ td.depasse { color: var(--rouge); }
   border-color: var(--rouge-bord); background: var(--rouge-fond); color: var(--rouge);
 }
 
+/* --- Sommaire de la page Outils ------------------------------------------
+   Sept outils sur une page longue, dont deux qui vivent ailleurs : sans
+   sommaire, la zakat et la purification n'existaient qu'en note finale. */
+
+/* L'en-tête est collant : une ancre qui amène le titre en haut de la
+   fenêtre l'amène en réalité derrière la barre de navigation. La marge de
+   défilement lui rend sa place. */
+[id] { scroll-margin-top: 88px; }
+.sommaire-outils {
+  display: grid; gap: 10px; margin: 0 0 22px;
+  grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+}
+.outil-carte {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 15px 16px; text-decoration: none;
+  background: var(--surface); border: 1px solid var(--bord);
+  border-radius: var(--rayon); box-shadow: var(--ombre);
+  transition: transform .14s, box-shadow .14s, border-color .14s;
+}
+.outil-carte:hover {
+  transform: translateY(-2px); box-shadow: var(--ombre-forte);
+  border-color: var(--jade);
+}
+.outil-ic {
+  flex: 0 0 auto; display: grid; place-items: center;
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--vert-fond); color: var(--vert);
+}
+.outil-corps { flex: 1; min-width: 0; }
+.outil-titre {
+  display: block; font-size: 14.5px; font-weight: 650;
+  color: var(--texte); letter-spacing: -0.012em;
+}
+.outil-sous {
+  display: block; font-size: 12.5px; color: var(--texte-faible);
+  line-height: 1.5; margin-top: 3px;
+}
+/* L'étiquette suit le titre au fil du texte. Posée à côté de la carte,
+   elle prenait sa largeur sur la description, qui partait alors en quatre
+   lignes là où les autres en tenaient deux. */
+.outil-tag {
+  display: inline-block; vertical-align: 2px;
+  margin-left: 6px; padding: 2px 8px; border-radius: var(--rayon-pill);
+  border: 1px solid var(--bord); background: var(--surface-2);
+  font-size: 10px; font-weight: 640; letter-spacing: .03em;
+  color: var(--texte-faible); text-transform: uppercase; white-space: nowrap;
+}
+
 .t-zakat { min-width: 780px; }
 .t-zakat td, .t-zakat th { white-space: nowrap; padding-left: 12px; padding-right: 12px; }
 .t-seuils { min-width: 620px; }

@@ -8,10 +8,45 @@
 
   <h1 class="titre-page">Outils</h1>
   <p class="chapeau">
-    Des calculateurs de projection, et rien de plus : ils font de l'arithmétique
-    sur les hypothèses que vous saisissez. Tout est calculé dans votre
-    navigateur — aucune de ces valeurs ne nous est transmise.
+    Les deux calculateurs de l'obligation religieuse — zakat et purification —
+    et cinq calculateurs de projection. Tout est calculé dans votre navigateur :
+    aucune des valeurs que vous saisissez ne nous est transmise.
   </p>
+
+  {# --- Sommaire ------------------------------------------------------
+     La zakat et la purification ont leur propre page, et n'étaient
+     annoncées qu'en note de bas de page, sous les cinq calculateurs et
+     un avertissement : les deux outils les plus attendus du site étaient
+     les moins visibles. Ils ouvrent maintenant la liste. #}
+  <div class="sommaire-outils">
+    {% for lien, ic, titre, sous, ailleurs in [
+        ('/zakat', 'balance', 'Zakat sur le patrimoine',
+         "L'assiette selon votre intention de détention, le nissab au cours du jour, le taux de 2,5 %. Actions, devises, or physique.", true),
+        ('/purification', 'pourcent', 'Purification des dividendes',
+         "La part des revenus non conformes à reverser, sur une ligne ou sur tout le portefeuille.", true),
+        ('#capitalisation', 'marche', 'Capitalisation des rendements',
+         "Ce que devient un capital si les bénéfices sont réinvestis, avec ou sans versements réguliers.", false),
+        ('#objectif', 'valeurs', 'Atteindre un objectif',
+         "L'effort d'épargne mensuel qu'un montant visé demande, sur une durée donnée.", false),
+        ('#inflation', 'baisse', 'Rendement réel, après inflation',
+         "Ce qu'un rendement nominal laisse une fois la hausse des prix retranchée.", false),
+        ('#revient', 'euro', 'Prix de revient unitaire',
+         "Le prix moyen d'une position construite en plusieurs achats.", false),
+        ('#devises', 'globe', 'Convertisseur de devises',
+         "Les " ~ devises | length ~ " devises de la collecte, franc CFA compris.", false)
+    ] %}
+      <a class="outil-carte" href="{{ lien }}">
+        <span class="outil-ic">{{ icone(ic, 20) }}</span>
+        <span class="outil-corps">
+          <span class="outil-titre">
+            {{ titre }}
+            {%- if ailleurs %} <span class="outil-tag">Page dédiée</span>{% endif %}
+          </span>
+          <span class="outil-sous">{{ sous }}</span>
+        </span>
+      </a>
+    {% endfor %}
+  </div>
 
   {# --- La nuance qu'il faut poser d'emblée --------------------------- #}
   <div class="encart">
@@ -31,7 +66,7 @@
   </div>
 
   {# --- 1. Capitalisation -------------------------------------------- #}
-  <h2 class="section">{{ icone("marche") }} Capitalisation des rendements</h2>
+  <h2 class="section" id="capitalisation">{{ icone("marche") }} Capitalisation des rendements</h2>
   <p class="chapeau">
     Ce que devient un capital placé, avec ou sans versements réguliers, si les
     bénéfices sont réinvestis.
@@ -91,7 +126,7 @@
   </div>
 
   {# --- 2. Objectif --------------------------------------------------- #}
-  <h2 class="section">{{ icone("valeurs") }} Atteindre un objectif</h2>
+  <h2 class="section" id="objectif">{{ icone("valeurs") }} Atteindre un objectif</h2>
   <p class="chapeau">
     Combien mettre de côté chaque mois pour réunir une somme donnée — un
     pèlerinage, un apport, les études d'un enfant.
@@ -124,7 +159,7 @@
   </div>
 
   {# --- 3. Rendement réel --------------------------------------------- #}
-  <h2 class="section">{{ icone("baisse") }} Rendement réel, après inflation</h2>
+  <h2 class="section" id="inflation">{{ icone("baisse") }} Rendement réel, après inflation</h2>
   <p class="chapeau">
     Un placement à 12 % dans un pays à 15 % d'inflation appauvrit son détenteur.
     C'est loin d'être théorique : la livre turque, la livre égyptienne et le naira
@@ -154,7 +189,7 @@
   </div>
 
   {# --- 4. Prix de revient -------------------------------------------- #}
-  <h2 class="section">{{ icone("euro") }} Prix de revient unitaire</h2>
+  <h2 class="section" id="revient">{{ icone("euro") }} Prix de revient unitaire</h2>
   <p class="chapeau">
     Le coût moyen de vos actions quand vous avez acheté en plusieurs fois — le
     chiffre à connaître avant de savoir si vous êtes en gain ou en perte.
@@ -182,7 +217,7 @@
   </div>
 
   {# --- 5. Convertisseur ---------------------------------------------- #}
-  <h2 class="section">{{ icone("globe") }} Convertisseur de devises</h2>
+  <h2 class="section" id="devises">{{ icone("globe") }} Convertisseur de devises</h2>
   <p class="chapeau">
     Les {{ devises | length }} devises de la collecte, franc CFA compris.
   </p>
@@ -224,8 +259,6 @@
     situation, de vos charges ni de votre horizon réel. Pour engager votre
     patrimoine, voyez un conseiller agréé ; pour engager votre religion, un
     savant qualifié.</p>
-    <p>Voir aussi&nbsp;: <a href="{{ url_for('purification') }}">Purification des
-    dividendes</a> et <a href="{{ url_for('zakat') }}">Zakat sur le patrimoine</a>.</p>
   </div>
 
 </main>
