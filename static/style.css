@@ -1129,6 +1129,17 @@ td.depasse { color: var(--rouge); }
   padding-left: 12px; padding-right: 12px;
 }
 
+/* La liste suivie porte une colonne de prose — la condition de bascule —
+   qui doit rester lisible sans étirer le tableau : on lui donne sa largeur
+   et on l'autorise seule à revenir à la ligne. */
+.t-suivi { min-width: 940px; }
+.t-suivi td, .t-suivi th { white-space: nowrap; padding-left: 12px; padding-right: 12px; }
+.t-suivi .condition {
+  white-space: normal; font-size: 13px; line-height: 1.5;
+  min-width: 300px; color: var(--texte-doux);
+}
+.t-suivi .condition strong { color: var(--texte); }
+
 /* Le pied du tableau porte les totaux : il doit se distinguer des lignes
    sans les écraser. */
 .t-portefeuille tfoot td {

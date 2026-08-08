@@ -4,7 +4,7 @@
 {% block description %}Surveillez des valeurs et voyez à quelle condition exacte elles deviendraient conformes — ou cesseraient de l'être.{% endblock %}
 
 {% block contenu %}
-<main class="page page-etroite">
+<main class="page">
 
   <h1 class="titre-page">Valeurs suivies</h1>
   <p class="chapeau">
@@ -47,23 +47,25 @@
   </div>
 
   <div class="outils" style="margin-top:16px">
-    <form method="get" action="/suivi">
-      <select name="standard" class="selecteur" onchange="this.form.submit()">
-        {% for sid, std in standards.items() %}
-          <option value="{{ sid }}" {% if sid == standard.id %}selected{% endif %}>Standard : {{ std.label }}</option>
-        {% endfor %}
-      </select>
-    </form>
-    <button type="button" class="lien-bouton" id="vider">Vider la liste</button>
+    <div class="segments">
+      {% for sid, std in standards.items() %}
+        <a href="?standard={{ sid }}" class="{% if sid == standard.id %}on{% endif %}">{{ std.label }}</a>
+      {% endfor %}
+    </div>
   </div>
 
   <div id="alertes"></div>
+  <div class="compteurs" id="compteurs" hidden></div>
 
   <div id="liste">
     <div class="cadre"><p class="vide" id="vide">
       Aucune valeur suivie. Ajoutez-en une ci-dessus.
     </p></div>
   </div>
+
+  <p class="pied-liens" style="margin-top:14px" id="pied" hidden>
+    <button type="button" class="lien-bouton" id="vider">Vider la liste</button>
+  </p>
 
   <div class="encart encart-neutre">
     <p><strong>Rien ne quitte votre navigateur.</strong>
@@ -82,7 +84,9 @@
 
   var elAjout = document.getElementById('ajout'),
       elListe = document.getElementById('liste'),
-      elAlertes = document.getElementById('alertes');
+      elAlertes = document.getElementById('alertes'),
+      elCompteurs = document.getElementById('compteurs'),
+      elPied = document.getElementById('pied');
 
   var LIBELLES = {conforme: 'Conforme', a_verifier: 'À vérifier', non_conforme: 'Non conforme'};
 
@@ -95,6 +99,12 @@
   }
   function nb(v, d) {
     return v.toLocaleString('fr-FR', {minimumFractionDigits: d, maximumFractionDigits: d});
+  }
+  function jourFr(iso) { return iso.split('-').reverse().join('/'); }
+  function echappe(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c];
+    });
   }
 
   var suivies = lire();
@@ -121,17 +131,21 @@
     // sert de point de comparaison pour signaler un basculement.
     suivies.push({ticker: t, depuis: new Date().toISOString().slice(0, 10), verdict: null});
     ecrire(suivies);
+    elAjout.value = '';
     charge();
   });
 
   document.getElementById('vider').addEventListener('click', function () {
     if (!suivies.length) return;
+    if (!confirm('Vider entièrement la liste suivie ?')) return;
     suivies = []; ecrire(suivies); charge();
   });
 
   function charge() {
     if (!suivies.length) {
       elAlertes.innerHTML = '';
+      elCompteurs.hidden = true;
+      elPied.hidden = true;
       elListe.innerHTML = '<div class="cadre"><p class="vide">Aucune valeur suivie. Ajoutez-en une ci-dessus.</p></div>';
       return;
     }
@@ -144,10 +158,35 @@
       });
   }
 
+  // La condition de bascule, en toutes lettres.
+  function texteCondition(v) {
+    var cond = v.condition;
+    if (!cond) {
+      return v.verdict === 'non_conforme'
+        ? 'Activité exclue : aucun ratio ne la rendrait conforme.'
+        : 'Condition non calculable — donnée de bilan manquante.';
+    }
+    if (cond.type === 'cours') {
+      return (cond.depasse ? 'Deviendrait conforme si le cours atteignait '
+                           : 'Cesserait de l\'être si le cours tombait sous ') +
+        '<strong>' + nb(cond.pivot, 2) + ' ' + echappe(cond.devise || '') + '</strong>' +
+        ' <span class="ticker">(' + (cond.ecart >= 0 ? '+' : '−') +
+        nb(Math.abs(cond.ecart) * 100, 1) + ' % depuis ' + nb(cond.actuel, 2) + ')</span>' +
+        '<br><span class="ticker">sur le ratio « ' + echappe(cond.ratio) + ' »</span>';
+    }
+    return (cond.depasse ? 'Deviendrait conforme si la dette descendait à '
+                         : 'Cesserait de l\'être si la dette dépassait ') +
+      '<strong>' + nb(cond.pivot / 1e9, 1) + ' Md</strong>' +
+      ' <span class="ticker">(contre ' + nb(cond.actuel / 1e9, 1) + ' Md aujourd\'hui)</span>' +
+      '<br><span class="ticker">sur le ratio « ' + echappe(cond.ratio) +
+      ' » — aucun mouvement de cours n\'y change rien</span>';
+  }
+
   function rend(data) {
     var changements = [];
+    var compte = {conforme: 0, a_verifier: 0, non_conforme: 0};
 
-    var lignes = data.valeurs.map(function (v) {
+    data.valeurs.forEach(function (v) {
       var suivi = suivies.filter(function (s) { return s.ticker === v.ticker; })[0];
       // Premier passage : on fige le verdict de référence sans crier au
       // changement — on ne peut pas signaler un écart avec rien.
@@ -155,45 +194,87 @@
       else if (suivi && suivi.verdict !== v.verdict) {
         changements.push({v: v, avant: suivi.verdict});
       }
+      v._suivi = suivi;
+      compte[v.verdict] += 1;
+    });
 
-      var cond = v.condition;
-      var texteCond;
-      if (!cond) {
-        texteCond = v.verdict === 'non_conforme'
-          ? 'Activité exclue : aucun ratio ne la rendrait conforme.'
-          : 'Condition non calculable — donnée de bilan manquante.';
-      } else if (cond.type === 'cours') {
-        texteCond = (cond.depasse ? 'Deviendrait conforme si le cours atteignait ' : 'Cesserait de l\'être si le cours tombait sous ') +
-          '<strong>' + nb(cond.pivot, 2) + ' ' + (cond.devise || '') + '</strong>' +
-          ' <span class="ticker">(' + (cond.ecart >= 0 ? '+' : '−') + nb(Math.abs(cond.ecart) * 100, 1) + ' % depuis ' + nb(cond.actuel, 2) + ')</span>' +
-          '<br><span class="ticker">sur le ratio « ' + cond.ratio + ' »</span>';
-      } else {
-        texteCond = (cond.depasse ? 'Deviendrait conforme si la dette descendait à ' : 'Cesserait de l\'être si la dette dépassait ') +
-          '<strong>' + nb(cond.pivot / 1e9, 1) + ' Md</strong>' +
-          ' <span class="ticker">(contre ' + nb(cond.actuel / 1e9, 1) + ' Md aujourd\'hui)</span>' +
-          '<br><span class="ticker">sur le ratio « ' + cond.ratio + ' » — aucun mouvement de cours n\'y change rien</span>';
-      }
+    // Les plus proches du seuil en premier : c'est l'ordre utile d'une liste
+    // de surveillance. Une valeur à 2 % du basculement demande une décision,
+    // une valeur à 90 % de marge n'en demande aucune. Celles dont la
+    // condition n'est pas calculable ferment la marche.
+    var proximite = function (v) {
+      return v.condition ? Math.abs(v.condition.ecart) : Infinity;
+    };
+    var valeurs = data.valeurs.slice().sort(function (a, b) {
+      return proximite(a) - proximite(b);
+    });
+
+    var lignes = valeurs.map(function (v) {
+      var n = v.note;
+      var marge = n
+        ? '<span class="note n-' + n.famille + '">' + echappe(n.lettre) + '</span>' +
+          '<div class="note-jauge" style="width:74px;margin-top:6px">' +
+          '<span class="note-part p-' + n.famille + '" style="width:' +
+          Math.max(2, Math.min(100, n.marge * 100)) + '%"></span></div>'
+        : '<span class="note-absente">—</span>';
+
+      var jour = (v.variation === null || v.variation === undefined)
+        ? '—'
+        : '<span class="' + (v.variation > 0 ? 'hausse' : v.variation < 0 ? 'baisse' : '') + '">' +
+          (v.variation > 0 ? '+' : v.variation < 0 ? '−' : '') +
+          nb(Math.abs(v.variation) * 100, 2) + ' %</span>';
 
       return '<tr>' +
-        '<td><a class="nom-valeur" href="/valeur/' + v.ticker + '?standard=' + STANDARD + '">' + v.nom + '</a>' +
-        '<div class="ticker">' + v.ticker + (suivi ? ' · suivi depuis le ' + suivi.depuis.split('-').reverse().join('/') : '') + '</div></td>' +
+        '<td><a class="nom-valeur" href="/valeur/' + encodeURIComponent(v.ticker) +
+          '?standard=' + STANDARD + '">' + echappe(v.nom) + '</a>' +
+          '<div class="ticker">' + echappe(v.ticker) +
+          (v._suivi ? ' · suivi depuis le ' + jourFr(v._suivi.depuis) : '') + '</div></td>' +
         '<td><span class="verdict v-' + v.verdict + '">' + LIBELLES[v.verdict] + '</span></td>' +
-        '<td>' + (v.note ? '<span class="note n-' + v.note.famille + '">' + v.note.lettre + '</span>' : '<span class="note-absente">—</span>') + '</td>' +
-        '<td style="font-size:13px;line-height:1.5">' + texteCond + '</td>' +
-        '<td class="a-droite"><button type="button" class="lien-bouton" data-retirer="' + v.ticker + '">Retirer</button></td>' +
+        '<td>' + marge + '</td>' +
+        '<td class="a-droite num">' + (v.prix ? nb(v.prix, 2) + ' ' + echappe(v.devise || '') : '—') + '</td>' +
+        '<td class="a-droite num">' + jour + '</td>' +
+        '<td class="condition">' + texteCondition(v) + '</td>' +
+        '<td class="a-droite"><button type="button" class="lien-bouton" data-retirer="' +
+          echappe(v.ticker) + '">Retirer</button></td>' +
         '</tr>';
     }).join('');
 
     elListe.innerHTML =
-      '<div class="cadre"><div class="defilement"><table><thead><tr>' +
-      '<th>Valeur</th><th>Verdict ' + data.standard + '</th><th>Marge</th>' +
+      '<div class="cadre"><div class="defilement"><table class="t-suivi"><thead><tr>' +
+      '<th>Valeur</th><th>Verdict</th><th>Marge</th>' +
+      '<th class="a-droite">Cours</th><th class="a-droite">Jour</th>' +
       '<th>Condition de bascule</th><th></th>' +
-      '</tr></thead><tbody>' + lignes + '</tbody></table></div></div>';
+      '</tr></thead><tbody>' + lignes + '</tbody></table></div></div>' +
+      '<p class="provenance">Triées par proximité du basculement : celles qui ' +
+      'demandent une décision sont en haut. Le verdict de référence est celui ' +
+      'du jour où vous avez ajouté la valeur.</p>';
+
+    // --- Compteurs ------------------------------------------------------
+    var tuiles = [
+      ['tous', 'Valeurs suivies', valeurs.length,
+        'depuis le ' + jourFr(suivies.map(function (s) { return s.depuis; }).sort()[0])],
+      ['conforme', 'Conformes', compte.conforme, LIBELLES.conforme.toLowerCase() + ' selon ' + data.standard],
+      ['a_verifier', 'À vérifier', compte.a_verifier, 'donnée manquante ou secteur ambigu'],
+      ['non_conforme', 'Non conformes', compte.non_conforme, 'au moins un ratio au-dessus du seuil']
+    ];
+    if (changements.length) {
+      tuiles.push(['non_conforme', 'Basculements', changements.length,
+        'depuis votre ajout — voir ci-dessus']);
+    }
+    elCompteurs.hidden = false;
+    elCompteurs.innerHTML = tuiles.map(function (t) {
+      return '<div class="compteur c-' + t[0] + '">' +
+        '<div class="compteur-nb num">' + t[2] + '</div>' +
+        '<div class="compteur-lb">' + t[1] + '</div>' +
+        '<div class="compteur-part">' + t[3] + '</div></div>';
+    }).join('');
+
+    elPied.hidden = false;
 
     elAlertes.innerHTML = changements.map(function (c) {
       var entrant = c.v.verdict === 'conforme';
       return '<div class="encart" style="border-left:4px solid var(--' + (entrant ? 'vert' : 'rouge') + ')">' +
-        '<p><strong>' + c.v.nom + ' a changé de verdict.</strong> ' +
+        '<p><strong>' + echappe(c.v.nom) + ' a changé de verdict.</strong> ' +
         'Cette valeur était <em>' + LIBELLES[c.avant].toLowerCase() + '</em> quand vous l\'avez ajoutée, ' +
         'elle est maintenant <em>' + LIBELLES[c.v.verdict].toLowerCase() + '</em> selon ' + data.standard + '.</p></div>';
     }).join('');
