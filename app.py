@@ -315,12 +315,20 @@ def analyses_page():
 
     entrees, sorties = analyses.changements(valeurs, standard_id)
 
+    # Le compte des verdicts, pour les compteurs de tête. La page l'énonçait
+    # jusqu'ici en prose au fil des sections ; un lecteur qui arrive veut
+    # d'abord savoir de combien de valeurs on parle, et combien passent.
+    compte = {"conforme": 0, "a_verifier": 0, "non_conforme": 0}
+    for e in evaluees:
+        compte[e["resultat"]["verdict"]] += 1
+
     return render_template(
         "analyses.html",
         entrees=entrees[:12],
         sorties=sorties[:12],
         nb_entrees=len(entrees),
         nb_sorties=len(sorties),
+        compte=compte,
         rendements=analyses.palmares_rendement(evaluees),
         tailles=analyses.palmares_taille(evaluees),
         places=analyses.par_place(evaluees, universe.PLACES),

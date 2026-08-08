@@ -22,21 +22,54 @@
     Un screener répond à « cette action est-elle conforme ? ». Ces pages répondent
     aux questions que personne ne pose pour vous : qu'est-ce qui a changé, où sont
     les valeurs conformes qui rapportent, et où les standards se contredisent.
-    Tout est calculé sur les {{ total }} valeurs de l'univers, selon
-    {{ standard.full }}.
+    Tout est calculé sur l'univers entier, selon {{ standard.full }}.
   </p>
 
-  <form class="outils" method="get" action="/analyses">
-    <select name="standard" class="selecteur" onchange="this.form.submit()">
+  <div class="outils">
+    <div class="segments">
       {% for sid, std in standards.items() %}
-        <option value="{{ sid }}" {% if sid == standard.id %}selected{% endif %}>Standard : {{ std.label }}</option>
+        <a href="?standard={{ sid }}" class="{% if sid == standard.id %}on{% endif %}">{{ std.label }}</a>
       {% endfor %}
-    </select>
-    <noscript><button class="bouton" type="submit">Appliquer</button></noscript>
-  </form>
+    </div>
+  </div>
+
+  {# --- Ce que ces six sections disent, en quatre nombres --------------- #}
+  <div class="compteurs">
+    {% for cle, nb, lb, detail in [
+        ('tous', total, 'Valeurs analysées',
+         places | length ~ ' places de cotation'),
+        ('conforme', compte.conforme, 'Conformes',
+         (compte.conforme / total) | pourcent ~ " de l'univers"),
+        ('conforme', nb_entrees, 'Entrées en conformité',
+         'au dernier arrêté comptable'),
+        ('non_conforme', nb_sorties, 'Sorties de conformité',
+         'au dernier arrêté comptable')
+    ] %}
+      <div class="compteur c-{{ cle }}">
+        <div class="compteur-nb num">{{ nb }}</div>
+        <div class="compteur-lb">{{ lb }}</div>
+        <div class="compteur-part">{{ detail }}</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  {# Six sections sur une page longue : sans sommaire, les deux dernières
+     ne se découvrent qu'en faisant défiler jusqu'au bout. #}
+  <nav class="ancres" aria-label="Sections de la page">
+    {% for cible, libelle in [
+        ('#changements', 'Ce qui a changé'),
+        ('#palmares', 'Où chercher'),
+        ('#desaccords', 'Contradictions'),
+        ('#standards', 'Choix du standard'),
+        ('#places', 'Par place'),
+        ('#secteurs', 'Par secteur')
+    ] %}
+      <a href="{{ cible }}">{{ libelle }}</a>
+    {% endfor %}
+  </nav>
 
   {# --- Les basculements : la vraie exclusivité de cette page ---------- #}
-  <h2 class="section">Ce qui a changé au dernier arrêté comptable</h2>
+  <h2 class="section" id="changements">Ce qui a changé au dernier arrêté comptable</h2>
   <div class="grille-analyses">
 
     <section class="carte">
@@ -116,7 +149,7 @@
   </div>
 
   {# --- Palmarès -------------------------------------------------------- #}
-  <h2 class="section">Où chercher parmi les conformes</h2>
+  <h2 class="section" id="palmares">Où chercher parmi les conformes</h2>
   <div class="grille-analyses">
 
     <section class="carte">
@@ -167,7 +200,7 @@
   </div>
 
   {# --- Désaccords entre standards -------------------------------------- #}
-  <h2 class="section">Là où les standards se contredisent</h2>
+  <h2 class="section" id="desaccords">Là où les standards se contredisent</h2>
   <section class="carte">
     <div class="carte-tete">
       <div>
@@ -215,7 +248,7 @@
   </section>
 
   {# --- Répartition par standard ---------------------------------------- #}
-  <h2 class="section">Ce que change le choix du standard</h2>
+  <h2 class="section" id="standards">Ce que change le choix du standard</h2>
   <div class="grille-analyses">
     {% for r in repartitions %}
       <section class="carte">
@@ -245,7 +278,7 @@
   </div>
 
   {# --- Par place ------------------------------------------------------- #}
-  <h2 class="section">Taux de conformité par place</h2>
+  <h2 class="section" id="places">Taux de conformité par place</h2>
   <details class="repli" open>
     <summary>
       Les {{ places | length }} places couvertes
@@ -303,7 +336,7 @@
   </details>
 
   {# --- Secteurs -------------------------------------------------------- #}
-  <h2 class="section">Les secteurs qui offrent le plus de conformes</h2>
+  <h2 class="section" id="secteurs">Les secteurs qui offrent le plus de conformes</h2>
   <details class="repli">
     <summary>
       Les {{ secteurs | length }} secteurs les mieux dotés

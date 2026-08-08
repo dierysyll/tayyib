@@ -1163,6 +1163,22 @@ td.depasse { color: var(--rouge); }
    fenêtre l'amène en réalité derrière la barre de navigation. La marge de
    défilement lui rend sa place. */
 [id] { scroll-margin-top: 88px; }
+
+/* Le sommaire d'une page à sections. Des liens, pas des onglets : on ne
+   choisit pas entre eux, on saute à l'un puis on revient. */
+.ancres {
+  display: flex; flex-wrap: wrap; gap: 7px;
+  margin: 0 0 24px;
+}
+.ancres a {
+  padding: 6px 13px; border-radius: var(--rayon-pill);
+  border: 1px solid var(--bord); background: var(--surface);
+  font-size: 13px; font-weight: 560; color: var(--texte-doux);
+  text-decoration: none; transition: color .12s, border-color .12s, background .12s;
+}
+.ancres a:hover {
+  color: var(--texte); border-color: var(--jade); background: var(--surface-2);
+}
 .sommaire-outils {
   display: grid; gap: 10px; margin: 0 0 22px;
   grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
