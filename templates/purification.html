@@ -3,7 +3,7 @@
 {% block description %}Calculez le montant à purifier sur vos dividendes : la part des revenus non conformes, ligne par ligne ou sur tout le portefeuille.{% endblock %}
 
 {% block contenu %}
-<main class="page page-etroite">
+<main class="page">
 
   <a class="retour" href="{{ url_for('outils') }}">← Outils</a>
 
@@ -23,12 +23,12 @@
     ni Yahoo, ni personne. Nous ne l'estimons pas et nous ne la devinons pas :
     c'est vous qui la saisissez, après lecture du document. Tout site qui vous
     affiche ce pourcentage sans dire d'où il vient l'a inventé.</p>
-    <p>Les trois standards fixent le plafond d'acceptabilité à
+    <p>Les standards fixent le plafond d'acceptabilité à
     <strong>{{ (seuil * 100) | round | int }} %</strong> du chiffre d'affaires. Au-delà,
     la valeur n'est pas purifiable : elle est exclue.</p>
   </div>
 
-  <h2 class="section">Calculer</h2>
+  <h2 class="section">Calculer une ligne</h2>
 
   <div class="calc">
     <div class="calc-champs">
@@ -78,6 +78,8 @@
     obtenir le total à purifier.
   </p>
 
+  <div class="compteurs" id="compteurs" hidden></div>
+
   <div class="cadre" id="cadre-portefeuille">
     <p class="vide" id="portefeuille-vide">
       Aucune ligne enregistrée. Ajoutez vos positions depuis la page
@@ -85,32 +87,25 @@
       dans votre navigateur.
     </p>
     <div class="defilement" id="portefeuille-table" hidden>
-      <table>
+      <table class="t-purification">
         <thead>
           <tr>
             <th>Valeur</th>
+            <th>Verdict</th>
             <th class="a-droite">Actions</th>
             <th class="a-droite">Dividende / action</th>
+            <th class="a-droite">Dividende perçu</th>
             <th class="a-droite">Revenus non conformes</th>
             <th class="a-droite">À purifier</th>
           </tr>
         </thead>
         <tbody id="lignes"></tbody>
+        <tfoot id="total-ligne"></tfoot>
       </table>
     </div>
   </div>
 
-  <div class="verdict-geant" id="total-bloc" hidden>
-    <div class="vg-case">
-      <div class="vg-lb">Dividendes perçus</div>
-      <div class="vg-val" id="total-brut">—</div>
-    </div>
-    <div class="vg-case accent">
-      <div class="vg-lb">Total à purifier</div>
-      <div class="vg-val" id="total-purifier">—</div>
-      <div class="vg-note">Somme des lignes renseignées.</div>
-    </div>
-  </div>
+  <p class="provenance" id="reste"></p>
 
   <div class="encart encart-neutre">
     <p><strong>Ce que ce calcul ne tranche pas.</strong>
@@ -129,8 +124,12 @@
 // stockage local, pour qu'une ligne saisie une fois serve partout.
 const CLE = 'tayyib.portefeuille.v1';
 const CLE_PARTS = 'tayyib.parts.v1';
+const SEUIL = {{ (seuil * 100) | round | int }};
+const LIBELLES = {conforme: 'Conforme', a_verifier: 'À vérifier', non_conforme: 'Non conforme'};
 
 const euro = n => n.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const echappe = s => String(s).replace(/[&<>"]/g,
+  c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 
 function lire(cle) {
   try { return JSON.parse(localStorage.getItem(cle)) || (cle === CLE ? [] : {}); }
@@ -162,8 +161,8 @@ function calculer() {
   document.getElementById('purifier').textContent = euro(aPurifier);
   document.getElementById('net').textContent = euro(brut - aPurifier);
   document.getElementById('note-purifier').textContent =
-    part > {{ (seuil * 100) | round | int }}
-      ? 'Au-delà de {{ (seuil * 100) | round | int }} %, la valeur est exclue : elle n\'est pas purifiable.'
+    part > SEUIL
+      ? 'Au-delà de ' + SEUIL + ' %, la valeur est exclue : elle n\'est pas purifiable.'
       : part.toString().replace('.', ',') + ' % du dividende perçu.';
 }
 champs.forEach(c => c.addEventListener('input', calculer));
@@ -206,54 +205,177 @@ document.getElementById('valeur').addEventListener('change', e => {
 });
 
 // --- Portefeuille ------------------------------------------------------
+function tuile(cle, valeur, libelle, detail) {
+  return '<div class="compteur c-' + cle + '">' +
+    '<div class="compteur-nb num">' + valeur + '</div>' +
+    '<div class="compteur-lb">' + libelle + '</div>' +
+    '<div class="compteur-part">' + (detail || '') + '</div></div>';
+}
+
+// La tuile du reste à saisir, dont le libellé entier dépend du nombre — y
+// compris quand il tombe à zéro, auquel cas « le total reste incomplet »
+// serait faux.
+function tuileReste(n) {
+  return {
+    cle: n ? 'a_verifier' : 'conforme',
+    valeur: n,
+    libelle: n > 1 ? 'Lignes à renseigner' : 'Ligne à renseigner',
+    detail: n ? 'le total reste incomplet' : 'toutes les lignes sont renseignées'
+  };
+}
+
 function rendrePortefeuille() {
-  const lignes = lire(CLE);
   const parts = lire(CLE_PARTS);
   const corps = document.getElementById('lignes');
   const table = document.getElementById('portefeuille-table');
   const vide = document.getElementById('portefeuille-vide');
-  const bloc = document.getElementById('total-bloc');
+  const compteurs = document.getElementById('compteurs');
+  const reste = document.getElementById('reste');
 
-  if (!lignes.length) { table.hidden = true; vide.hidden = false; bloc.hidden = true; return; }
-  table.hidden = false; vide.hidden = true; bloc.hidden = false;
+  // Les plus gros dividendes en premier : c'est là que le montant à purifier
+  // se joue, et c'est le rapport annuel qu'on ira lire en priorité.
+  const lignes = lire(CLE).map(l => {
+    const v = univers.find(x => x.ticker === l.ticker) || {};
+    const dividende = v.dividende_eur || 0;
+    return {ticker: l.ticker, qte: l.qte, v: v, dividende: dividende,
+            brut: dividende * l.qte};
+  }).sort((a, b) => b.brut - a.brut);
+
+  if (!lignes.length) {
+    table.hidden = true; vide.hidden = false;
+    compteurs.hidden = true; reste.hidden = true;
+    return;
+  }
+  table.hidden = false; vide.hidden = true;
 
   corps.innerHTML = '';
-  let totalBrut = 0, totalPurif = 0;
+  let totalBrut = 0, totalPurif = 0, aRenseigner = 0, sansDividende = 0, exclues = 0;
 
-  lignes.forEach(ligne => {
-    const v = univers.find(x => x.ticker === ligne.ticker) || {};
-    const dividende = v.dividende_eur || 0;
-    const brut = dividende * ligne.qte;
-    const part = parts[ligne.ticker];
-    const purif = (part !== undefined && part !== '') ? brut * (part / 100) : null;
+  lignes.forEach(l => {
+    const part = parts[l.ticker];
+    const renseignee = part !== undefined && part !== '';
+    const purif = renseignee ? l.brut * (parseFloat(part) / 100) : null;
 
-    totalBrut += brut;
+    totalBrut += l.brut;
     if (purif !== null) totalPurif += purif;
+    if (!l.dividende) { sansDividende += 1; }
+    else if (!renseignee) { aRenseigner += 1; }
+    if (l.v.verdict === 'non_conforme') { exclues += 1; }
+
+    const trop = renseignee && parseFloat(part) > SEUIL;
+    const verdict = l.v.verdict
+      ? '<span class="verdict v-' + l.v.verdict + '">' + LIBELLES[l.v.verdict] + '</span>'
+      : '<span class="note-absente">—</span>';
 
     const tr = document.createElement('tr');
     tr.innerHTML =
-      '<td><strong>' + (v.nom || ligne.ticker) + '</strong><div class="ticker">' + ligne.ticker + '</div></td>' +
-      '<td class="a-droite">' + ligne.qte + '</td>' +
-      '<td class="a-droite">' + (dividende ? euro(dividende) : '—') + '</td>' +
+      '<td><a class="nom-valeur" href="/valeur/' + encodeURIComponent(l.ticker) +
+        '?standard={{ standard.id }}">' + echappe(l.v.nom || l.ticker) + '</a>' +
+        '<div class="ticker">' + echappe(l.ticker) + '</div></td>' +
+      '<td>' + verdict + '</td>' +
+      '<td class="a-droite num">' + l.qte.toLocaleString('fr-FR') + '</td>' +
+      '<td class="a-droite num">' + (l.dividende ? euro(l.dividende) + ' €' : '—') + '</td>' +
+      '<td class="a-droite num">' + (l.brut ? euro(l.brut) + ' €' : '—') + '</td>' +
       '<td class="a-droite"><input type="number" min="0" max="100" step="0.01" ' +
-        'style="width:88px;text-align:right;padding:6px 9px;border:1px solid var(--bord);' +
-        'border-radius:8px;background:var(--surface-2);color:var(--texte);font:inherit" ' +
-        'data-ticker="' + ligne.ticker + '" value="' + (part ?? '') + '" placeholder="%"></td>' +
-      '<td class="a-droite">' + (purif !== null ? euro(purif) : '—') + '</td>';
+        'class="champ-pourcent' + (trop ? ' au-dela' : '') + '" ' +
+        'data-ticker="' + echappe(l.ticker) + '" value="' + echappe(part ?? '') +
+        '" placeholder="%"' + (l.dividende ? '' : ' disabled') + '></td>' +
+      '<td class="a-droite num">' + (purif !== null ? euro(purif) + ' €' : '—') + '</td>';
     corps.appendChild(tr);
   });
 
-  document.getElementById('total-brut').textContent = euro(totalBrut);
-  document.getElementById('total-purifier').textContent = euro(totalPurif);
+  document.getElementById('total-ligne').innerHTML =
+    '<tr><td>Total</td><td></td><td></td><td></td>' +
+    '<td class="a-droite num">' + euro(totalBrut) + ' €</td><td></td>' +
+    '<td class="a-droite num">' + euro(totalPurif) + ' €</td></tr>';
+
+  compteurs.hidden = false;
+  compteurs.innerHTML =
+    tuile('tous', euro(totalBrut) + ' €', 'Dividendes perçus',
+      'au rythme des derniers versements') +
+    tuile('non_conforme', euro(totalPurif) + ' €', 'À purifier',
+      totalBrut > 0 ? euro(totalPurif / totalBrut * 100) + ' % des dividendes' : '') +
+    tuile('conforme', euro(totalBrut - totalPurif) + ' €', 'Vous conservez',
+      'après purification des lignes renseignées') +
+    (r => tuile(r.cle, r.valeur, r.libelle, r.detail))(tuileReste(aRenseigner));
+
+  // Ce que le total ne dit pas de lui-même.
+  const notes = [];
+  if (aRenseigner) {
+    notes.push('Tant qu\'une part n\'est pas saisie, sa ligne compte pour zéro : '
+      + 'le total à purifier est donc un plancher, pas un montant définitif.');
+  }
+  if (sansDividende) {
+    notes.push(sansDividende + (sansDividende > 1 ? ' lignes ne versent' : ' ligne ne verse')
+      + ' pas de dividende connu — il n\'y a rien à purifier dessus, et le champ est inactif.');
+  }
+  if (exclues) {
+    notes.push(exclues + (exclues > 1 ? ' lignes portent' : ' ligne porte')
+      + ' une activité exclue. La purification s\'applique aux revenus accessoires '
+      + 'd\'une société par ailleurs conforme ; sur une activité exclue, elle ne '
+      + 'régularise rien — c\'est la détention elle-même qui est en cause.');
+  }
+  reste.hidden = !notes.length;
+  reste.textContent = notes.join(' ');
 
   corps.querySelectorAll('input[data-ticker]').forEach(input => {
     input.addEventListener('input', e => {
       const parts = lire(CLE_PARTS);
       parts[e.target.dataset.ticker] = e.target.value;
       localStorage.setItem(CLE_PARTS, JSON.stringify(parts));
-      rendrePortefeuille();
+      // On ne redessine pas le tableau à chaque frappe : le champ perdrait
+      // le focus au premier chiffre. Seuls les totaux se rafraîchissent.
+      majTotaux();
     });
   });
+}
+
+// Recalcule les totaux sans toucher au tableau, pour ne pas interrompre la
+// saisie en cours.
+function majTotaux() {
+  const parts = lire(CLE_PARTS);
+  let totalBrut = 0, totalPurif = 0, aRenseigner = 0;
+  const lignes = lire(CLE);
+
+  lignes.forEach(l => {
+    const v = univers.find(x => x.ticker === l.ticker) || {};
+    const brut = (v.dividende_eur || 0) * l.qte;
+    const part = parts[l.ticker];
+    const renseignee = part !== undefined && part !== '';
+    totalBrut += brut;
+    if (renseignee) { totalPurif += brut * (parseFloat(part) / 100) || 0; }
+    else if (v.dividende_eur) { aRenseigner += 1; }
+  });
+
+  document.querySelectorAll('#lignes tr').forEach(tr => {
+    const input = tr.querySelector('input[data-ticker]');
+    if (!input) return;
+    const l = lignes.find(x => x.ticker === input.dataset.ticker);
+    const v = univers.find(x => x.ticker === input.dataset.ticker) || {};
+    const brut = (v.dividende_eur || 0) * (l ? l.qte : 0);
+    const part = parts[input.dataset.ticker];
+    const ok = part !== undefined && part !== '';
+    input.classList.toggle('au-dela', ok && parseFloat(part) > SEUIL);
+    tr.lastElementChild.textContent = ok ? euro(brut * (parseFloat(part) / 100)) + ' €' : '—';
+  });
+
+  document.getElementById('total-ligne').innerHTML =
+    '<tr><td>Total</td><td></td><td></td><td></td>' +
+    '<td class="a-droite num">' + euro(totalBrut) + ' €</td><td></td>' +
+    '<td class="a-droite num">' + euro(totalPurif) + ' €</td></tr>';
+
+  const c = document.getElementById('compteurs').children;
+  if (c.length === 4) {
+    c[1].querySelector('.compteur-nb').textContent = euro(totalPurif) + ' €';
+    c[1].querySelector('.compteur-part').textContent =
+      totalBrut > 0 ? euro(totalPurif / totalBrut * 100) + ' % des dividendes' : '';
+    c[2].querySelector('.compteur-nb').textContent = euro(totalBrut - totalPurif) + ' €';
+    const r = tuileReste(aRenseigner);
+    c[3].className = 'compteur c-' + r.cle;
+    c[3].querySelector('.compteur-nb').textContent = r.valeur;
+    c[3].querySelector('.compteur-lb').textContent = r.libelle;
+    c[3].querySelector('.compteur-part').textContent = r.detail;
+  }
 }
 </script>
 {% endblock %}

@@ -1140,9 +1140,25 @@ td.depasse { color: var(--rouge); }
 }
 .t-suivi .condition strong { color: var(--texte); }
 
+/* La purification se saisit dans le tableau : le champ doit se voir comme
+   un champ, et signaler seul le dépassement du plafond des standards. */
+.t-purification { min-width: 900px; }
+.t-purification td, .t-purification th { white-space: nowrap; padding-left: 12px; padding-right: 12px; }
+.champ-pourcent {
+  width: 92px; text-align: right; padding: 6px 9px; font: inherit;
+  border: 1px solid var(--bord); border-radius: 8px;
+  background: var(--surface-2); color: var(--texte);
+}
+.champ-pourcent:focus { outline: 2px solid var(--jade); outline-offset: 1px; }
+.champ-pourcent:disabled { opacity: .45; cursor: not-allowed; }
+.champ-pourcent.au-dela {
+  border-color: var(--rouge-bord); background: var(--rouge-fond); color: var(--rouge);
+}
+
 /* Le pied du tableau porte les totaux : il doit se distinguer des lignes
    sans les écraser. */
-.t-portefeuille tfoot td {
+.t-portefeuille tfoot td,
+.t-purification tfoot td {
   border-top: 2px solid var(--bord); border-bottom: 0;
   font-weight: 660; background: var(--surface-2);
 }
