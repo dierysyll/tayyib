@@ -6,8 +6,9 @@
 
   <h1 class="titre-page">Votre portefeuille</h1>
   <p class="chapeau">
-    Saisissez vos lignes : Tayyib calcule la part conforme de votre portefeuille
-    selon {{ standard.full }}, et vous dit quelles positions posent problème.
+    Saisissez vos lignes avec leur prix de revient : Tayyib suit la valorisation,
+    la plus-value latente et la variation du jour, et vous dit quelle part de
+    l'ensemble est conforme selon {{ standard.full }}.
   </p>
 
   <div class="encart encart-neutre">
@@ -34,12 +35,22 @@
       </div>
       <div class="champ">
         <label for="pf-qte">Nombre d'actions</label>
-        <input type="number" id="pf-qte" min="0" step="1" placeholder="ex. 25">
+        <input type="number" id="pf-qte" min="0" step="any" placeholder="ex. 25">
+      </div>
+      <div class="champ">
+        <label for="pf-pru">Prix d'achat unitaire</label>
+        <input type="number" id="pf-pru" min="0" step="any" placeholder="cours du jour">
       </div>
       <div class="champ" style="flex:0 0 auto">
         <button class="bouton" id="pf-ajouter" type="button">Ajouter la ligne</button>
       </div>
     </div>
+    <p class="calc-note" id="pf-aide">
+      Le prix d'achat s'entend dans la devise de cotation de la valeur. Laissé
+      vide, il prend le cours du jour — c'est le comportement d'une simulation :
+      vous achetez maintenant. Ajouter une valeur déjà présente cumule les
+      quantités et recalcule le prix de revient moyen.
+    </p>
   </div>
 
   <div id="pf-vide" class="cadre">
@@ -49,20 +60,43 @@
   <div id="pf-resultats" hidden>
     <div class="compteurs" id="pf-compteurs"></div>
 
+    <h2 class="section">Vos positions</h2>
     <div class="cadre defilement">
-      <table>
+      <table class="t-portefeuille">
         <thead>
           <tr>
             <th>Valeur</th>
-            <th>Verdict {{ standard.label }}</th>
-            <th class="a-droite">Actions</th>
+            {# Le standard est déjà nommé dans le chapeau et dans le sélecteur
+               juste au-dessus : le répéter ici coûtait quatre-vingt-dix pixels
+               de large et poussait la colonne « Poids » hors du cadre. #}
+            <th>Verdict</th>
+            <th class="a-droite">Qté</th>
+            <th class="a-droite">Prix de revient</th>
+            <th class="a-droite">Cours</th>
+            <th class="a-droite">Jour</th>
             <th class="a-droite">Valorisation</th>
+            <th class="a-droite">+/− value</th>
             <th class="a-droite">Poids</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="pf-lignes"></tbody>
+        <tfoot id="pf-total"></tfoot>
       </table>
+    </div>
+
+    <p class="provenance" id="pf-revenu"></p>
+
+    <h2 class="section">Répartition</h2>
+    <div class="ventilations">
+      <div class="cadre ventilation">
+        <h3 class="ventilation-titre">Par secteur</h3>
+        <div id="pf-secteurs"></div>
+      </div>
+      <div class="cadre ventilation">
+        <h3 class="ventilation-titre">Par place</h3>
+        <div id="pf-places"></div>
+      </div>
     </div>
 
     <div class="encart" id="pf-alerte" hidden></div>
@@ -76,6 +110,10 @@
 
 <script>
 (function () {
+  // v2 : les lignes portent désormais un prix de revient. Les portefeuilles
+  // enregistrés sous v1 sont repris tels quels, sans prix — leurs positions
+  // s'affichent, mais sans plus-value, parce qu'inventer un prix d'achat
+  // qu'on n'a jamais eu produirait un gain imaginaire.
   var CLE = 'tayyib.portefeuille.v1';
   var STANDARD = {{ standard.id | tojson }};
   var LIBELLES = {conforme: 'Conforme', a_verifier: 'À vérifier', non_conforme: 'Non conforme'};
@@ -84,11 +122,14 @@
 
   var elValeur = document.getElementById('pf-valeur'),
       elQte = document.getElementById('pf-qte'),
+      elPru = document.getElementById('pf-pru'),
       elLignes = document.getElementById('pf-lignes'),
+      elTotal = document.getElementById('pf-total'),
       elCompteurs = document.getElementById('pf-compteurs'),
       elVide = document.getElementById('pf-vide'),
       elResultats = document.getElementById('pf-resultats'),
-      elAlerte = document.getElementById('pf-alerte');
+      elAlerte = document.getElementById('pf-alerte'),
+      elRevenu = document.getElementById('pf-revenu');
 
   function charge() {
     try { return JSON.parse(localStorage.getItem(CLE)) || []; }
@@ -100,8 +141,20 @@
     catch (e) { /* navigation privée : on continue sans persistance */ }
   }
 
-  function euros(v) {
-    return v.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  function nb(v, d) {
+    return v.toLocaleString('fr-FR', {minimumFractionDigits: d, maximumFractionDigits: d});
+  }
+  function euros(v) { return nb(v, 2) + ' €'; }
+
+  // Un montant signé, avec sa couleur. Le signe est explicite : « +1 240 € »
+  // se lit d'un coup d'œil là où « 1 240 € » demande de chercher ailleurs
+  // s'il s'agit d'un gain ou d'une perte.
+  function signe(v, suffixe, decimales) {
+    var s = document.createElement('span');
+    s.className = v > 0 ? 'hausse' : (v < 0 ? 'baisse' : '');
+    s.textContent = (v > 0 ? '+' : v < 0 ? '−' : '')
+      + nb(Math.abs(v), decimales === undefined ? 2 : decimales) + suffixe;
+    return s;
   }
 
   fetch('/api/univers.json?standard=' + encodeURIComponent(STANDARD))
@@ -123,6 +176,16 @@
       elValeur.innerHTML = '<option value="">Univers indisponible</option>';
     });
 
+  // Le prix de revient est saisi en devise de cotation ; tous les totaux se
+  // font en euros. Sans cette conversion, additionner une ligne saoudienne
+  // et une ligne parisienne donnerait un nombre dénué de sens, affiché avec
+  // un symbole € qui le rendrait crédible.
+  function enEuros(v, montant) {
+    if (montant === null || montant === undefined || !v.prix) return null;
+    var taux = (v.prix_eur || 0) / v.prix;
+    return montant * taux;
+  }
+
   function rend() {
     // On ignore les lignes dont le ticker a disparu de l'univers plutôt que
     // d'afficher une position fantôme sans prix ni verdict.
@@ -136,24 +199,52 @@
     elVide.hidden = true;
     elResultats.hidden = false;
 
-    var total = 0, parVerdict = {conforme: 0, a_verifier: 0, non_conforme: 0};
+    var total = 0, investi = 0, veille = 0, revenu = 0, sansPru = 0;
+    var parVerdict = {conforme: 0, a_verifier: 0, non_conforme: 0};
+    var parSecteur = {}, parPlace = {};
+
     actives.forEach(function (l) {
       var v = univers[l.ticker];
-      // Valorisation en euros convertis, jamais en devise de cotation :
-      // additionner une ligne saoudienne et une ligne parisienne dans leurs
-      // devises respectives donnerait un total dénué de sens, et les parts
-      // de portefeuille qu'on en tire seraient fausses.
       l.valeur = (v.prix_eur || 0) * l.qte;
+      l.revient = enEuros(v, l.pru);
+      l.cout = l.revient === null ? null : l.revient * l.qte;
+      l.gain = l.cout === null ? null : l.valeur - l.cout;
+
+      // La variation du jour est une fraction ; la valeur de la veille s'en
+      // déduit, et l'écart des deux est ce que la journée a coûté ou rapporté.
+      l.veille = v.variation ? l.valeur / (1 + v.variation) : l.valeur;
+
       total += l.valeur;
+      veille += l.veille;
+      if (l.cout === null) { sansPru += 1; } else { investi += l.cout; }
+      revenu += (v.dividende_eur || 0) * l.qte;
       parVerdict[v.verdict] += l.valeur;
+      var s = v.secteur || 'Secteur non renseigné';
+      parSecteur[s] = (parSecteur[s] || 0) + l.valeur;
+      var p = v.place_nom || v.place || 'Place inconnue';
+      parPlace[p] = (parPlace[p] || 0) + l.valeur;
     });
 
+    var gain = investi > 0 ? (total - sansPruValeur(actives)) - investi : null;
+    var jour = total - veille;
+
     elCompteurs.innerHTML = '';
-    ajouteCompteur('tous', 'Valorisation totale', euros(total) + ' €');
-    ['conforme', 'a_verifier', 'non_conforme'].forEach(function (v) {
-      var part = total > 0 ? (parVerdict[v] / total * 100) : 0;
-      ajouteCompteur(v, LIBELLES[v], part.toFixed(1).replace('.', ',') + ' %');
-    });
+    ajouteCompteur('tous', 'Valorisation totale', euros(total),
+      investi > 0 ? euros(investi) + ' investis' : null);
+
+    if (gain !== null) {
+      ajouteCompteur(gain >= 0 ? 'conforme' : 'non_conforme', 'Plus-value latente',
+        (gain >= 0 ? '+' : '−') + euros(Math.abs(gain)),
+        nb(gain / investi * 100, 2) + ' % du montant investi');
+    }
+    ajouteCompteur(jour >= 0 ? 'conforme' : 'non_conforme', 'Variation du jour',
+      (jour >= 0 ? '+' : '−') + euros(Math.abs(jour)),
+      veille > 0 ? nb(jour / veille * 100, 2) + ' %' : null);
+
+    var partConforme = total > 0 ? parVerdict.conforme / total * 100 : 0;
+    ajouteCompteur('conforme', 'Part conforme', nb(partConforme, 1) + ' %',
+      nb(parVerdict.a_verifier / total * 100, 1) + ' % à vérifier · '
+      + nb(parVerdict.non_conforme / total * 100, 1) + ' % non conforme');
 
     elLignes.innerHTML = '';
     actives.sort(function (a, b) { return b.valeur - a.valeur; }).forEach(function (l) {
@@ -179,9 +270,31 @@
       tdv.appendChild(sp);
       tr.appendChild(tdv);
 
-      tr.appendChild(cellule(l.qte.toLocaleString('fr-FR'), 'a-droite num'));
-      tr.appendChild(cellule(euros(l.valeur) + ' €', 'a-droite num'));
-      tr.appendChild(cellule(total > 0 ? (l.valeur / total * 100).toFixed(1).replace('.', ',') + ' %' : '—', 'a-droite num'));
+      tr.appendChild(cellule(nb(l.qte, 0), 'a-droite num'));
+      tr.appendChild(cellule(l.pru ? nb(l.pru, 2) + ' ' + (v.devise || '') : '—', 'a-droite num'));
+      tr.appendChild(cellule(v.prix ? nb(v.prix, 2) + ' ' + (v.devise || '') : '—', 'a-droite num'));
+
+      var tdj = document.createElement('td');
+      tdj.className = 'a-droite num';
+      if (v.variation === null || v.variation === undefined) { tdj.textContent = '—'; }
+      else { tdj.appendChild(signe(v.variation * 100, ' %')); }
+      tr.appendChild(tdj);
+
+      tr.appendChild(cellule(euros(l.valeur), 'a-droite num'));
+
+      var tdg = document.createElement('td');
+      tdg.className = 'a-droite num';
+      if (l.gain === null) { tdg.textContent = '—'; }
+      else {
+        tdg.appendChild(signe(l.gain, ' €'));
+        var pc = document.createElement('div');
+        pc.className = 'ticker num';
+        pc.textContent = (l.gain >= 0 ? '+' : '−') + nb(Math.abs(l.gain / l.cout * 100), 2) + ' %';
+        tdg.appendChild(pc);
+      }
+      tr.appendChild(tdg);
+
+      tr.appendChild(cellule(total > 0 ? nb(l.valeur / total * 100, 1) + ' %' : '—', 'a-droite num'));
 
       var tdx = document.createElement('td');
       tdx.className = 'a-droite';
@@ -198,6 +311,46 @@
 
       elLignes.appendChild(tr);
     });
+
+    elTotal.innerHTML = '';
+    var trt = document.createElement('tr');
+    trt.appendChild(cellule('Total', ''));
+    trt.appendChild(cellule('', ''));
+    trt.appendChild(cellule('', ''));
+    trt.appendChild(cellule('', ''));
+    trt.appendChild(cellule('', ''));
+    var tdjt = document.createElement('td');
+    tdjt.className = 'a-droite num';
+    tdjt.appendChild(signe(jour, ' €'));
+    trt.appendChild(tdjt);
+    trt.appendChild(cellule(euros(total), 'a-droite num'));
+    var tdgt = document.createElement('td');
+    tdgt.className = 'a-droite num';
+    if (gain === null) { tdgt.textContent = '—'; } else { tdgt.appendChild(signe(gain, ' €')); }
+    trt.appendChild(tdgt);
+    trt.appendChild(cellule('100 %', 'a-droite num'));
+    trt.appendChild(cellule('', ''));
+    elTotal.appendChild(trt);
+
+    var messages = [];
+    if (revenu > 0) {
+      messages.push('Revenu annuel attendu au rythme des derniers dividendes versés : '
+        + euros(revenu) + '. Ce n\'est pas un engagement — un dividende se décide '
+        + 'chaque année. Sur les lignes non conformes, la part à purifier se calcule '
+        + 'sur la page Purification.');
+    }
+    if (sansPru) {
+      messages.push(sansPru + ' ligne' + (sansPru > 1 ? 's ont' : ' a')
+        + ' été saisie' + (sansPru > 1 ? 's' : '') + ' sans prix d\'achat : '
+        + 'elle' + (sansPru > 1 ? 's comptent' : ' compte') + ' dans la valorisation, '
+        + 'mais pas dans la plus-value. Retirez-la puis ressaisissez-la avec son '
+        + 'prix de revient pour l\'y faire entrer.');
+    }
+    elRevenu.textContent = messages.join(' ');
+    elRevenu.hidden = !messages.length;
+
+    repartition(document.getElementById('pf-secteurs'), parSecteur, total);
+    repartition(document.getElementById('pf-places'), parPlace, total);
 
     var problemes = actives.filter(function (l) {
       return univers[l.ticker].verdict !== 'conforme';
@@ -220,6 +373,40 @@
     }
   }
 
+  // La valorisation des seules lignes sans prix de revient : elle sort du
+  // calcul de plus-value, faute de point de départ auquel la comparer.
+  function sansPruValeur(actives) {
+    return actives.reduce(function (s, l) {
+      return s + (l.cout === null ? l.valeur : 0);
+    }, 0);
+  }
+
+  function repartition(hote, parts, total) {
+    hote.innerHTML = '';
+    Object.keys(parts).sort(function (a, b) { return parts[b] - parts[a]; })
+      .forEach(function (cle) {
+        var pct = total > 0 ? parts[cle] / total * 100 : 0;
+        var d = document.createElement('div');
+        d.className = 'part';
+        var t = document.createElement('div');
+        t.className = 'part-tete';
+        var n = document.createElement('span');
+        n.textContent = cle;
+        var p = document.createElement('span');
+        p.className = 'num';
+        p.textContent = nb(pct, 1) + ' %';
+        t.appendChild(n); t.appendChild(p);
+        var j = document.createElement('div');
+        j.className = 'part-jauge';
+        var b = document.createElement('div');
+        b.className = 'part-barre';
+        b.style.width = pct + '%';
+        j.appendChild(b);
+        d.appendChild(t); d.appendChild(j);
+        hote.appendChild(d);
+      });
+  }
+
   function cellule(texte, classe) {
     var td = document.createElement('td');
     td.className = classe || '';
@@ -227,25 +414,50 @@
     return td;
   }
 
-  function ajouteCompteur(cle, libelle, valeur) {
+  function ajouteCompteur(cle, libelle, valeur, detail) {
     var d = document.createElement('div');
     d.className = 'compteur c-' + cle;
-    d.innerHTML = '<div class="compteur-nb num"></div><div class="compteur-lb"></div>';
+    d.innerHTML = '<div class="compteur-nb num"></div><div class="compteur-lb"></div>'
+      + '<div class="compteur-part num"></div>';
     d.querySelector('.compteur-nb').textContent = valeur;
     d.querySelector('.compteur-lb').textContent = libelle;
+    d.querySelector('.compteur-part').textContent = detail || '';
     elCompteurs.appendChild(d);
   }
+
+  // Le cours du jour s'affiche dans le champ dès qu'une valeur est choisie :
+  // c'est le prix par défaut, autant qu'il se voie avant d'être accepté.
+  elValeur.addEventListener('change', function () {
+    var v = univers[elValeur.value];
+    elPru.placeholder = v && v.prix
+      ? 'cours du jour : ' + nb(v.prix, 2) + ' ' + (v.devise || '')
+      : 'cours du jour';
+  });
 
   document.getElementById('pf-ajouter').addEventListener('click', function () {
     var ticker = elValeur.value, qte = parseFloat(elQte.value);
     if (!ticker || !qte || qte <= 0) return;
+    var v = univers[ticker];
+    var pru = parseFloat(elPru.value);
+    if (!(pru > 0)) { pru = v.prix || null; }
 
     var existante = lignes.filter(function (l) { return l.ticker === ticker; })[0];
-    if (existante) { existante.qte += qte; }
-    else { lignes.push({ticker: ticker, qte: qte}); }
+    if (existante) {
+      // Prix de revient moyen pondéré, comme le calcule un courtier. Si
+      // l'ancienne ligne n'en avait pas, la nouvelle n'en aura pas non plus :
+      // une moyenne dont un terme manque n'est pas une moyenne.
+      existante.pru = (existante.pru && pru)
+        ? (existante.pru * existante.qte + pru * qte) / (existante.qte + qte)
+        : null;
+      existante.qte += qte;
+    } else {
+      lignes.push({ticker: ticker, qte: qte, pru: pru});
+    }
 
     elQte.value = '';
+    elPru.value = '';
     elValeur.value = '';
+    elPru.placeholder = 'cours du jour';
     sauve(); rend();
   });
 

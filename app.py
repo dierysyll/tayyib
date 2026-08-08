@@ -765,8 +765,19 @@ def api_univers():
                     e["societe"].get("dividende_par_action"),
                     e["societe"].get("currency"), taux
                 ),
-                "secteur": e["societe"].get("industry") or e["societe"].get("sector"),
+                # La variation du jour permet au portefeuille d'afficher ce
+                # qu'il a gagné ou perdu depuis l'ouverture, comme le fait
+                # n'importe quel relevé de courtier.
+                "variation": e["societe"].get("variation"),
+                # Secteur et place sont traduits ici plutôt que côté client :
+                # une répartition de portefeuille qui annonce « brvm » et
+                # « Specialty Chemicals » sur un site français n'est pas une
+                # répartition lisible.
+                "secteur": vocabulaire.activite(e["societe"], _langue())
+                           or vocabulaire.secteur(e["societe"].get("sector"), _langue()),
                 "place": e["societe"].get("place"),
+                "place_nom": (universe.PLACES.get(e["societe"].get("place") or "")
+                              or {}).get("nom"),
                 # Postes de bilan : ils servent à la page Zakat pour estimer
                 # la part zakatable d'une société détenue à long terme.
                 "cash": e["societe"].get("cash_and_investments"),

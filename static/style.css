@@ -1093,6 +1093,49 @@ td.depasse { color: var(--rouge); }
 .provenance { font-size: 13px; color: var(--texte-faible); margin: 10px 0 0; line-height: 1.6; max-width: 82ch; }
 .provenance a { color: var(--texte-doux); }
 
+/* --- Portefeuille : répartitions et totaux -------------------------------
+   Un relevé de courtier ne se lit pas ligne à ligne : on veut d'abord savoir
+   où l'argent est concentré. Deux barres suffisent — par secteur et par
+   place — et elles disent ce qu'un camembert dirait moins bien, puisqu'on
+   compare des parts à une même base horizontale. */
+.ventilations { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+/* `.repartition` existe déjà : c'est la barre empilée des standards, haute
+   de dix pixels. Réutiliser le nom écrasait ce bloc à cette hauteur-là. */
+.ventilation { padding: 17px 19px 15px; }
+.ventilation-titre {
+  font-size: 13px; font-weight: 640; color: var(--texte-doux);
+  letter-spacing: .04em; text-transform: uppercase; margin: 0 0 12px;
+}
+.part + .part { margin-top: 11px; }
+.part-tete {
+  display: flex; justify-content: space-between; gap: 12px;
+  font-size: 13px; margin-bottom: 5px;
+}
+.part-tete span:first-child {
+  color: var(--texte-doux); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.part-jauge { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.part-barre { height: 100%; border-radius: 3px; background: var(--jade); }
+
+/* Dix colonnes ne tiennent pas dans 720 px : les montants s'y coupaient de
+   leur devise, « 172,38 » sur une ligne et « EUR » sur la suivante. Le
+   tableau défile dans son cadre, ce qui vaut mieux qu'un nombre cassé. */
+.t-portefeuille { min-width: 1000px; }
+.t-portefeuille td, .t-portefeuille th {
+  white-space: nowrap;
+  /* Dix colonnes qui ne se coupent pas ont besoin de gouttières plus
+     serrées, sinon la dernière sort du cadre sur un écran ordinaire. */
+  padding-left: 12px; padding-right: 12px;
+}
+
+/* Le pied du tableau porte les totaux : il doit se distinguer des lignes
+   sans les écraser. */
+.t-portefeuille tfoot td {
+  border-top: 2px solid var(--bord); border-bottom: 0;
+  font-weight: 660; background: var(--surface-2);
+}
+
 .vide { padding: 52px 20px; text-align: center; color: var(--texte-doux); }
 
 
