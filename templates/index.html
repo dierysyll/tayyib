@@ -155,7 +155,10 @@
   <div class="cadre">
     {% if evaluees %}
     <div class="defilement">
-      <table>
+      {# `t-screener` commande le repli des colonnes secondaires sur petit
+         écran (voir style.css). Il est propre à ce tableau-ci, dont on
+         connaît les huit colonnes et leur ordre. #}
+      <table class="t-screener">
         <thead>
           <tr>
             <th>Valeur</th>

@@ -357,6 +357,10 @@ a { color: inherit; }
 .defilement { overflow-x: auto; }
 
 table { width: 100%; border-collapse: collapse; min-width: 720px; }
+/* La largeur minimale protège les tableaux à huit colonnes, qu'elle
+   empêche de s'écraser. Un tableau qui en compte trois n'en a pas besoin,
+   et elle lui imposerait un défilement horizontal sans raison. */
+table.t-etroit { min-width: 0; }
 
 th {
   text-align: left; padding: 12px 18px;
@@ -1106,13 +1110,20 @@ td.depasse { color: var(--rouge); }
   /* Le verdict est la colonne pour laquelle on vient : elle doit tenir
      sans défilement horizontal. On garde le nom, le verdict et la marge —
      cette dernière tient en deux caractères et dit l'essentiel. Secteur,
-     place, ratios et capitalisation restent sur la fiche. */
-  table { min-width: 0; }
-  .cadre th:nth-child(2), .cadre td:nth-child(2),
-  .cadre th:nth-child(3), .cadre td:nth-child(3),
-  .cadre th:nth-child(6), .cadre td:nth-child(6),
-  .cadre th:nth-child(7), .cadre td:nth-child(7),
-  .cadre th:nth-child(8), .cadre td:nth-child(8) { display: none; }
+     place, ratios et capitalisation restent sur la fiche.
+
+     Ce repli vaut pour le seul tableau du screener, dont on connaît les
+     huit colonnes. Appliqué à toutes les tables, il retirait la deuxième
+     et la troisième de n'importe laquelle : le verdict disparaissait de
+     la page d'une place, et un bilan n'y gardait que ses libellés, sans
+     un chiffre. Les autres tableaux défilent horizontalement dans leur
+     cadre, ce à quoi `.defilement` sert. */
+  table.t-screener { min-width: 0; }
+  .t-screener th:nth-child(2), .t-screener td:nth-child(2),
+  .t-screener th:nth-child(3), .t-screener td:nth-child(3),
+  .t-screener th:nth-child(6), .t-screener td:nth-child(6),
+  .t-screener th:nth-child(7), .t-screener td:nth-child(7),
+  .t-screener th:nth-child(8), .t-screener td:nth-child(8) { display: none; }
   th, td { padding-left: 13px; padding-right: 13px; }
 }
 

@@ -648,6 +648,67 @@
 
   <div class="panneau" id="p-finances" role="tabpanel" hidden>
 
+  {# --- Le bilan lui-même ---------------------------------------------
+     Les quatre grandeurs du screening n'apparaissaient jusqu'ici qu'en
+     numérateurs de ratios, dans l'onglet Conformité. Elles valent d'être
+     lues pour elles-mêmes : ce sont les comptes de la société, et sur les
+     valeurs d'Abidjan c'était même la seule page de cet onglet — le reste
+     vient de Yahoo, qui ne connaît pas cette place. #}
+  {% if societe.total_assets %}
+    <h2 class="section">
+      Bilan{% if societe.bilan_date %} au {{ societe.bilan_date | date_fr }}{% endif %}
+    </h2>
+    <div class="cadre defilement">
+      <table class="t-etroit">
+        <thead>
+          <tr>
+            <th>Poste</th>
+            <th class="a-droite">Montant</th>
+            <th class="a-droite">Part du bilan</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lb, val in [
+              ('Total du bilan', societe.total_assets),
+              ('Dette portant intérêt', societe.total_debt),
+              ('Trésorerie et placements', societe.cash_and_investments),
+              ('Créances clients', societe.receivables)
+          ] %}
+            <tr>
+              <td>{{ lb }}</td>
+              <td class="a-droite num">
+                {% if val is none %}—
+                {% else %}{{ val | montant }} {{ societe.currency or '' }}{% endif %}
+              </td>
+              <td class="a-droite num">
+                {% if val is none %}—
+                {% elif loop.first %}100 %
+                {% else %}{{ (val / societe.total_assets) | pourcent }}{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="provenance">
+      {%- if societe.bilan_plan %}
+        Comptes lus dans les états financiers déposés par la société
+        {%- if societe.bilan_source %} (<a href="{{ societe.bilan_source }}"
+          rel="noopener">le document</a>){% endif %}, au plan
+        {{ societe.bilan_plan }}.
+      {%- else %}
+        Montants lus dans le bilan publié, et non dans la fiche de synthèse
+        de la source : les quatre lignes viennent du même arrêté comptable.
+      {%- endif %}
+      Un bilan ne dit pas tout d'une société — il ne dit rien de sa
+      rentabilité, de son carnet de commandes ni de la qualité de sa
+      gestion. Il dit ce que les standards de screening demandent.
+    </p>
+    {% if societe.bilan_reserve %}
+      <p class="note">{{ societe.bilan_reserve }}</p>
+    {% endif %}
+  {% endif %}
+
   {# --- Valorisation -------------------------------------------------- #}
   {% set v = societe.valorisation or {} %}
   {% if v.per or v.price_to_book or v.ev_ebitda %}
