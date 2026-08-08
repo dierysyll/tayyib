@@ -3,7 +3,7 @@
 {% block description %}Calculez la zakat due sur votre patrimoine : actions, épargne en francs CFA, dirhams, dinars ou autres devises, or et argent physiques. Nissab au cours du jour, taux de 2,5 %.{% endblock %}
 
 {% block contenu %}
-<main class="page page-etroite">
+<main class="page">
 
   <a class="retour" href="{{ url_for('outils') }}">← Outils</a>
 
@@ -53,17 +53,19 @@
       dans votre navigateur, elles ne nous sont jamais transmises.
     </p>
     <div class="defilement" id="pf-table" hidden>
-      <table>
+      <table class="t-zakat">
         <thead>
           <tr>
             <th>Valeur</th>
             <th class="a-droite">Actions</th>
             <th class="a-droite">Cours</th>
             <th class="a-droite">Valeur</th>
-            <th class="a-droite">Assiette zakatable</th>
+            <th class="a-droite">Part zakatable</th>
+            <th class="a-droite">Assiette</th>
           </tr>
         </thead>
         <tbody id="pf-lignes"></tbody>
+        <tfoot id="pf-total"></tfoot>
       </table>
     </div>
   </div>
@@ -148,7 +150,10 @@
     </div>
   {% endif %}
 
-  <h2 class="section">5. Zakat due</h2>
+  <h2 class="section">5. Ce qui compose votre assiette</h2>
+  <div class="compteurs" id="composition"></div>
+
+  <h2 class="section">6. Zakat due</h2>
   <div class="verdict-geant">
     <div class="vg-case">
       <div class="vg-lb">Assiette retenue</div>
@@ -165,6 +170,24 @@
       <div class="vg-val" id="zakat">—</div>
       <div class="vg-note" id="note-zakat"></div>
     </div>
+  </div>
+
+  {# Les deux seuils côte à côte. La page affirme plus haut qu'elle ne
+     choisit pas à la place du lecteur ; l'y obliger par une liste
+     déroulante, sans lui montrer ce que l'autre référence donnerait,
+     démentait cette promesse. #}
+  <div class="cadre defilement" id="cadre-seuils" hidden>
+    <table class="t-seuils">
+      <thead>
+        <tr>
+          <th>Référence</th>
+          <th class="a-droite">Nissab</th>
+          <th class="a-droite">Votre assiette</th>
+          <th>Zakat due</th>
+        </tr>
+      </thead>
+      <tbody id="seuils"></tbody>
+    </table>
   </div>
 
   <div class="encart encart-neutre">
@@ -193,6 +216,55 @@
 
   function euro(n) {
     return n.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €';
+  }
+
+  function echappe(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c];
+    });
+  }
+
+  // La composition de l'assiette, poste par poste. Les postes vides sont
+  // tus : afficher « 0,00 € d'or physique » à quelqu'un qui n'en détient
+  // pas encombre sans rien apprendre.
+  function composition(postes, assiette) {
+    var hote = document.getElementById('composition');
+    var utiles = postes.filter(function (p) { return Math.abs(p[1]) > 0.005; });
+    hote.hidden = !utiles.length;
+    hote.innerHTML = utiles.map(function (p) {
+      // La part n'est affichée que sur ce qui s'ajoute. Les dettes se
+      // retranchent : « 11 % de l'assiette » les ferait passer pour une
+      // composante, et les parts affichées dépasseraient 100 % à elles trois.
+      var part = (p[1] > 0 && assiette > 0)
+        ? ' · ' + (p[1] / assiette * 100).toFixed(0) + ' % de l\'assiette' : '';
+      return '<div class="compteur c-' + p[0] + '">' +
+        '<div class="compteur-nb num">' + euro(p[1]) + '</div>' +
+        '<div class="compteur-lb">' + p[2] + '</div>' +
+        '<div class="compteur-part">' + echappe(p[3]) + part + '</div></div>';
+    }).join('');
+  }
+
+  // Les deux nissabs, et ce que chacun donnerait. Les écoles divergent sur
+  // la référence à retenir ; montrer les deux résultats vaut mieux que de
+  // proclamer qu'on ne choisit pas tout en n'en affichant qu'un.
+  function seuils(assiette) {
+    var cadre = document.getElementById('cadre-seuils');
+    var refs = [
+      ['Or — 85 g', METAUX.nissab_or],
+      ['Argent — 595 g', METAUX.nissab_argent]
+    ].filter(function (r) { return r[1]; });
+
+    if (!refs.length || !assiette) { cadre.hidden = true; return; }
+    cadre.hidden = false;
+    document.getElementById('seuils').innerHTML = refs.map(function (r) {
+      var due = assiette >= r[1];
+      return '<tr><td>' + r[0] + '</td>' +
+        '<td class="a-droite num">' + euro(r[1]) + '</td>' +
+        '<td class="a-droite num">' + euro(assiette) + '</td>' +
+        '<td><span class="verdict v-' + (due ? 'non_conforme' : 'conforme') + '">' +
+          (due ? euro(assiette * TAUX_ZAKAT) : 'Sous le seuil — rien n\'est dû') +
+        '</span></td></tr>';
+    }).join('');
   }
 
   function lire(cle, defaut) {
@@ -253,9 +325,14 @@
 
     elAvoirs.querySelectorAll('input[data-champ], select[data-champ]').forEach(function (el) {
       el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', function () {
-        avoirs[+el.dataset.i][el.dataset.champ] = el.value;
+        var idx = +el.dataset.i;
+        avoirs[idx][el.dataset.champ] = el.value;
         ecrire(CLE_AVOIRS, avoirs);
-        rendAvoirs();
+        // On ne redessine pas la liste des avoirs : elle contient le champ
+        // en cours de saisie, qui perdrait le focus au premier chiffre.
+        // Seule la contrepartie en euros de cette ligne est réécrite.
+        var sortie = el.closest('.calc-champs').querySelector('.cs-val');
+        if (sortie) { sortie.textContent = euro(enEuros(avoirs[idx])); }
         rendre();
       });
     });
@@ -318,7 +395,7 @@
     elVide.hidden = !!actives.length;
 
     elLignes.innerHTML = '';
-    var totalActions = 0;
+    var totalActions = 0, totalMarche = 0;
 
     actives.forEach(function (l) {
       var v = univers[l.ticker];
@@ -331,25 +408,56 @@
       var assiette = valeur * part;
       totalActions += assiette;
 
+      totalMarche += valeur;
+
+      // Ce que recouvre la part zakatable : trésorerie et créances de la
+      // société, rapportées à son bilan. L'afficher évite que « 34 % » ait
+      // l'air d'un coefficient tombé du ciel.
+      var detail;
+      if (negoce) { detail = 'valeur de marché entière'; }
+      else if (approx) { detail = 'bilan absent — 100 % retenu'; }
+      else {
+        detail = 'trésorerie et créances rapportées au bilan';
+      }
+
       var tr = document.createElement('tr');
       tr.innerHTML =
-        '<td><strong>' + v.nom + '</strong><div class="ticker">' + l.ticker +
-          (v.devise && v.devise !== 'EUR' ? ' · ' + v.devise : '') + '</div></td>' +
-        '<td class="a-droite">' + l.qte + '</td>' +
-        '<td class="a-droite">' + (v.prix ? v.prix.toLocaleString('fr-FR') + ' ' + (v.devise || '') : '—') + '</td>' +
-        '<td class="a-droite">' + euro(valeur) + '</td>' +
-        '<td class="a-droite">' + euro(assiette) +
-          (negoce ? '' : '<div class="ticker">' +
-            (approx ? 'bilan absent — 100 % retenu' : Math.round(part * 100) + ' % du bilan') +
-            '</div>') +
-        '</td>';
+        '<td><a class="nom-valeur" href="/valeur/' + encodeURIComponent(l.ticker) +
+          '?standard={{ standard.id }}">' + echappe(v.nom) + '</a>' +
+          '<div class="ticker">' + echappe(l.ticker) +
+          (v.devise && v.devise !== 'EUR' ? ' · ' + echappe(v.devise) : '') + '</div></td>' +
+        '<td class="a-droite num">' + l.qte.toLocaleString('fr-FR') + '</td>' +
+        '<td class="a-droite num">' + (v.prix ? v.prix.toLocaleString('fr-FR') + ' ' + echappe(v.devise || '') : '—') + '</td>' +
+        '<td class="a-droite num">' + euro(valeur) + '</td>' +
+        '<td class="a-droite num">' + Math.round(part * 100) + ' %' +
+          '<div class="ticker">' + detail + '</div></td>' +
+        '<td class="a-droite num">' + euro(assiette) + '</td>';
       elLignes.appendChild(tr);
     });
 
+    document.getElementById('pf-total').innerHTML = actives.length
+      ? '<tr><td>Total</td><td></td><td></td>' +
+        '<td class="a-droite num">' + euro(totalMarche) + '</td><td></td>' +
+        '<td class="a-droite num">' + euro(totalActions) + '</td></tr>'
+      : '';
+
     var autres = avoirs.reduce(function (s, a) { return s + enEuros(a); }, 0);
     var dettes = parseFloat(elDettes.value) || 0;
-    var assiette = Math.max(0, totalActions + autres + valeurMetaux() - dettes);
+    var metaux = valeurMetaux();
+    var assiette = Math.max(0, totalActions + autres + metaux - dettes);
     var nissab = parseFloat(elNissab && elNissab.value) || 0;
+
+    // La composition, parce qu'un total seul ne se vérifie pas. Le lecteur
+    // doit pouvoir retrouver d'où vient chaque euro avant d'en donner 2,5 %.
+    composition([
+      ['tous', totalActions, 'Titres',
+        negoce ? 'valeur de marché' : 'quote-part zakatable'],
+      ['tous', autres, 'Avoirs en devises',
+        (function (n) { return n > 1 ? n + ' lignes saisies' : 'une ligne saisie'; })(
+          avoirs.filter(function (a) { return parseFloat(a.montant) > 0; }).length)],
+      ['tous', metaux, 'Or et argent physiques', 'au cours du jour'],
+      ['non_conforme', -dettes, 'Dettes exigibles', 'déduites de l\'assiette']
+    ], assiette);
 
     document.getElementById('assiette').textContent = assiette ? euro(assiette) : '—';
     document.getElementById('note-assiette').textContent =
@@ -357,6 +465,7 @@
       ', avoirs et métaux, dettes déduites.';
 
     document.getElementById('nissab-val').textContent = nissab ? euro(nissab) : '—';
+    seuils(assiette);
 
     var elZakat = document.getElementById('zakat');
     var elNote = document.getElementById('note-zakat');

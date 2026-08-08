@@ -1155,9 +1155,14 @@ td.depasse { color: var(--rouge); }
   border-color: var(--rouge-bord); background: var(--rouge-fond); color: var(--rouge);
 }
 
+.t-zakat { min-width: 780px; }
+.t-zakat td, .t-zakat th { white-space: nowrap; padding-left: 12px; padding-right: 12px; }
+.t-seuils { min-width: 620px; }
+
 /* Le pied du tableau porte les totaux : il doit se distinguer des lignes
    sans les écraser. */
 .t-portefeuille tfoot td,
+.t-zakat tfoot td,
 .t-purification tfoot td {
   border-top: 2px solid var(--bord); border-bottom: 0;
   font-weight: 660; background: var(--surface-2);
