@@ -187,10 +187,16 @@ titres, de sorte que le site sert un univers qui grandit pendant la collecte.
   Jones, S&P Shariah — ne peuvent donc pas conclure sur cette place, là où
   MSCI Islamic, FTSE Shariah et SC Malaisie tranchent normalement.
 - Les **bilans de la BRVM** sont lus dans les PDF déposés par les émetteurs,
-  et 23 des 28 sociétés que le secteur ne tranche pas d'emblée sont
-  couvertes. Les cinq autres publient sous une forme que `data/bilans.py`
-  refuse de lire plutôt que d'interpréter de travers ; elles restent
-  « à vérifier ».
+  et 26 des 28 sociétés que le secteur ne tranche pas d'emblée sont
+  couvertes. Les deux dernières — NEI-CEDA et TotalEnergies Marketing
+  Sénégal — publient un bilan **en image** : la page ne porte aucune
+  couche de texte, rien n'y est lisible sans reconnaissance optique de
+  caractères, et deviner des chiffres n'est pas une option ici. Elles
+  restent « à vérifier ».
+- Les comptes lus ne sont pas tous du dernier exercice. SODECI publie ses
+  états 2025 dans une police sans table de correspondance, illisible ; son
+  dernier bilan exploitable est celui de 2022. La date d'arrêté est
+  affichée sur chaque fiche, précisément pour que l'ancienneté se voie.
 - **Casablanca** n'est toujours pas couverte, et la source le dit mal : elle
   répond « Too Many Requests » là où elle devrait répondre « symbole
   inconnu », ce qui donne l'illusion d'une place récupérable en réessayant.

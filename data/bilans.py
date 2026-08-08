@@ -28,9 +28,20 @@ sous deux formes :
     sociétés qui ne déposent qu'une synthèse.
 
 S'y ajoutent les quelques groupes qui consolident en **IFRS** — Sonatel
-au premier chef, et c'est la valeur la plus détenue de la place. Les
+et Orange au premier chef, les deux plus grosses valeurs de la place. Les
 ignorer aurait vidé l'exercice de son intérêt, donc leur présentation est
 lue aussi.
+
+Ce qui reste hors de portée
+---------------------------
+Deux sociétés de la cote déposent un bilan **en image** : la page ne porte
+aucune couche de texte, et il n'y a rien à y lire sans reconnaissance
+optique de caractères. Une OCR qui se trompe d'un chiffre sur un total de
+bilan produit un ratio faux sans le moindre signe extérieur, et ce module
+préfère refuser. Une troisième publie dans une police sans table de
+correspondance : le texte en sort chiffré — « Immobilisations » devient
+« !""#$%&%'()%#*' » — ce qui, par chance, ne ressemble à aucun libellé et
+se refuse donc tout seul.
 
 Le piège de la colonne, et comment on l'évite
 ---------------------------------------------
@@ -115,17 +126,30 @@ LIBELLES_PASSIF = {
     ),
 }
 
-# La présentation IFRS des groupes consolidés.
+# La présentation IFRS des groupes consolidés. Comme en SYSCOHADA, les
+# totaux valent des deux côtés : c'est la colonne qui désigne le sien.
+TOTAUX_IFRS = (
+    r"TOTAL\s+DE\s+L.ACTIF", r"TOTAL\s+ACTIFS?",
+    r"TOTAL\s+DU\s+PASSIF\s+ET\s+DES\s+CAPITAUX\s+PROPRES", r"TOTAL\s+PASSIFS?",
+)
 LIBELLES_IFRS_ACTIF = {
-    "total_assets": (r"TOTAL\s+DE\s+L.ACTIF$",),
-    "cash_and_investments": (r"DISPONIBILIT[EÉ]S\s+ET\s+QUASI[\s-]?DISPONIBILIT[EÉ]S$",),
-    "receivables": (r"CR[EÉ]ANCES\s+CLIENTS$",),
+    "total_assets": TOTAUX_IFRS,
+    "cash_and_investments": (
+        r"DISPONIBILIT[EÉ]S\s+ET\s+QUASI[\s-]?DISPONIBILIT[EÉ]S",
+        r"TR[EÉ]SORERIE\s+ET\s+[EÉ]QUIVALENTS?\s+DE\s+TR[EÉ]SORERIE",
+    ),
+    "receivables": (r"CR[EÉ]ANCES\s+CLIENTS",),
 }
 LIBELLES_IFRS_PASSIF = {
-    "total_passif": (r"TOTAL\s+DU\s+PASSIF\s+ET\s+DES\s+CAPITAUX\s+PROPRES$",),
+    "total_passif": TOTAUX_IFRS,
+    # Les emprunts liés aux droits d'utilisation sont les dettes de
+    # location d'IFRS 16 : la même chose que les « dettes locatives », sous
+    # le nom que leur donnent les sociétés qui citent la norme.
     "total_debt": (
-        r"PASSIFS\s+FINANCIERS\s+(NON\s+)?COURANTS$",
-        r"DETTES\s+LOCATIVES\s+(NON\s+)?COURANTES$",
+        r"PASSIFS\s+FINANCIERS\s+(NON\s+)?COURANTS",
+        r"DETTES\s+LOCATIVES\s+(NON\s+)?COURANTES",
+        r"EMPRUNTS\s+ET\s+DETTES\s+FINANCI[EÈ]RES\s+(NON\s+)?COURANTES",
+        r"EMPRUNTS\s+LI[EÉ]S\s+AUX\s+DROITS\s+D.UTILISATION.*",
     ),
 }
 
@@ -157,12 +181,43 @@ APPROXIMATIONS = {
     ),
 }
 
+# Le franc s'abrège de six façons sur cette cote — FCFA, F CFA, F.CFA,
+# FRANCS CFA… Ne pas les couvrir toutes ne laisse pas l'unité inconnue :
+# elle est lue comme l'unité, et le bilan de Filtisac tombait alors sous le
+# plancher de crédibilité, donc était refusé.
+FRANC = r"(F[\s.]*CFA|FRANCS?)"
 UNITES = (
-    (1_000_000, re.compile(r"en\s+millions?\s+(de\s+)?(F\s*CFA|FRANCS)", re.I)),
-    (1_000, re.compile(r"en\s+milliers?\s+(de\s+)?(F\s*CFA|FRANCS)", re.I)),
+    (1_000_000_000, re.compile(r"en\s+milliards?\s+(de\s+)?" + FRANC, re.I)),
+    (1_000_000, re.compile(r"en\s+millions?\s+(de\s+)?" + FRANC, re.I)),
+    (1_000, re.compile(r"en\s+milliers?\s+(de\s+)?" + FRANC, re.I)),
 )
 
-JETON = re.compile(r"^\(?-?[\d,]+\)?$")
+# Les présentations IFRS renvoient aux notes annexes en fin de libellé —
+# « Créances clients 5.4 », « Passifs financiers non courants 6.1 ». Le
+# renvoi n'est pas un montant, il ne se détache pas du texte, et il
+# empêcherait le libellé d'être reconnu.
+RENVOI = re.compile(r"\s+\d+(\.\d+)*$")
+
+# Le même renvoi, isolé. Orange l'imprime dans une colonne à lui, si bien
+# qu'un blanc le sépare du libellé : il ne doit pas pour autant passer pour
+# le début d'un tableau voisin, sinon « Disponibilités et
+# quasi-disponibilités » se retrouve sans ses montants.
+NOTE = re.compile(r"^\d+(\.\d+)+$")
+
+# Les parenthèses d'un montant vont par paire — c'est ainsi que les
+# présentations IFRS écrivent les négatifs. Une parenthèse fermante seule
+# appartient au texte : « 16) », dans « Emprunts liés aux droits
+# d'utilisation (IFRS 16) », est la fin d'un renvoi à la norme, et le lire
+# comme un montant coupait le libellé de ses chiffres.
+JETON = re.compile(r"^(\(-?[\d,]+\)|-?[\d,]+)$")
+
+# Le blanc à partir duquel deux mots n'appartiennent plus au même libellé,
+# en largeurs de caractère. Mesuré sur les documents de la cote : les
+# espaces entre mots restent sous 4,5, les sauts d'une colonne à l'autre
+# commencent à 6. C'est ce qui sépare « Écart de conversion actif - - »
+# de « Trésorerie passif » chez SOGB, où le trait n'est pas un tiret de
+# ponctuation mais une cellule vide, et où 700 M de dette se perdaient.
+SAUT_COLONNE = 6.0
 DATE_BILAN = re.compile(r"\b31[/\-. ]?(?:12|d[ée]c\w*)[/\-. ]?(\d{4})\b", re.I)
 
 # Deux montants sont « les mêmes » à un franc près : l'actif et le passif
@@ -211,33 +266,54 @@ def _lignes(page, tolerance=2.5):
             for _, mots in sorted(lignes.items())]
 
 
+def _saut(avant, apres):
+    """Ce blanc est-il un changement de colonne plutôt qu'une espace ?"""
+    largeur = (avant["x1"] - avant["x0"]) / max(1, len(avant["text"]))
+    return (apres["x0"] - avant["x1"]) > SAUT_COLONNE * largeur
+
+
 def _cellules(ligne):
-    """Sépare une ligne en libellé et en montants situés.
+    """Découpe une ligne en segments « libellé puis montants ».
 
     Deux groupes de chiffres appartiennent au même montant si l'espace qui
     les sépare tient dans une largeur et demie de caractère. Au-delà, c'est
     une autre colonne — voir l'en-tête du module pour la mesure.
 
-    Le libellé s'arrête au premier montant, et c'est essentiel : ces PDF
-    impriment deux tableaux côte à côte, si bien qu'une ligne porte le
-    bilan à gauche et le compte de résultat à droite. Tout prendre donnerait
-    « TOTAL ACTIF Achats de matières premières », qui ne ressemble plus à
-    rien de reconnaissable.
+    Une ligne porte souvent **deux tableaux**, imprimés côte à côte : le
+    bilan à gauche, le compte de résultat à droite, ou l'actif à gauche et
+    le passif à droite. Un libellé qui recommence après des montants ouvre
+    donc un nouveau segment, au lieu d'être ignoré. Sans cela, la ligne
+    « TOTAL ACTIF 39 148 981 61 061 747 TOTAL PASSIF 39 148 981 61 061 747 »
+    de Filtisac perdait la moitié droite, et son passif tout entier avec.
     """
-    libelle, montants = [], []
+    segments, libelle, montants = [], [], []
+
+    def clore():
+        if libelle or montants:
+            segments.append((RENVOI.sub("", " ".join(libelle)), montants))
+
+    precedent = None
     for mot in ligne:
         texte = mot["text"]
         if not JETON.match(texte):
-            if not montants:
-                libelle.append(texte)
+            # Un libellé qui reprend après des montants, ou après un blanc
+            # de largeur de colonne, appartient au tableau voisin.
+            if montants or (precedent and _saut(precedent, mot)
+                            and not NOTE.match(texte)):
+                clore()
+                libelle, montants = [], []
+            libelle.append(texte)
+            precedent = mot
             continue
+        precedent = mot
         largeur = (mot["x1"] - mot["x0"]) / max(1, len(texte))
         if montants and (mot["x0"] - montants[-1]["x1"]) < 1.5 * largeur:
             montants[-1]["texte"] += texte
             montants[-1]["x1"] = mot["x1"]
         else:
             montants.append({"texte": texte, "x0": mot["x0"], "x1": mot["x1"]})
-    return " ".join(libelle), montants
+    clore()
+    return segments
 
 
 def _colonne(montants, bord, marge=6.0):
@@ -310,15 +386,16 @@ def _releves(pages, postes, par_code):
     for numero, lignes in enumerate(pages):
         page = {}
         for rang, ligne in enumerate(lignes):
-            libelle, montants = _cellules(ligne)
-            if not montants:
-                continue
-            mots = libelle.split()
-            code = mots[0].upper() if mots else ""
-            reste = " ".join(mots[1:]) if par_code else libelle
-            for poste, motifs in postes.items():
-                if _correspond(reste, code, motifs, par_code):
-                    page.setdefault(poste, []).append(((numero, rang), montants))
+            for colonne, (libelle, montants) in enumerate(_cellules(ligne)):
+                if not montants:
+                    continue
+                mots = libelle.split()
+                code = mots[0].upper() if mots else ""
+                reste = " ".join(mots[1:]) if par_code else libelle
+                ou = (numero, rang, colonne)
+                for poste, motifs in postes.items():
+                    if _correspond(reste, code, motifs, par_code):
+                        page.setdefault(poste, []).append((ou, montants))
         if "total_assets" in page or "total_passif" in page:
             trouvailles.append(page)
     return trouvailles
@@ -396,6 +473,7 @@ def lire(contenu, exercice=None):
     # parole de l'émetteur, elle prime sur ce que nous croyons lire.
     annee = exercice or _exercice(textes)
 
+    meilleur = None          # un total trouvé, mais sans aucun poste
     for plan, postes_actif, postes_passif, par_code in PLANS:
         for actif in _releves(pages, postes_actif, par_code):
             for passif in _releves(pages, postes_passif, par_code):
@@ -425,8 +503,23 @@ def lire(contenu, exercice=None):
                 lu["bilan_date"] = f"{annee}-12-31" if annee else None
                 lu["bilan_plan"] = LIBELLES_PLANS[plan]
                 lu["bilan_reserve"] = APPROXIMATIONS.get(plan)
-                return lu
-    return None
+
+                # Un plan peut retrouver l'identité comptable sans lire un
+                # seul poste : SODECI publie ses totaux sous des intitulés
+                # que le plan condensé reconnaît, mais ses postes sous des
+                # intitulés IFRS. Dans ce cas seulement on va voir le plan
+                # suivant, en gardant ce total de côté.
+                #
+                # Dès qu'un poste est lu, en revanche, on s'arrête là. Aller
+                # chercher mieux ailleurs ferait basculer CIE de son bilan
+                # social vers le bilan des actifs concédés, qui porte plus
+                # de postes reconnaissables mais n'est pas celui de la
+                # société.
+                if any(v is not None for v in postes.values()):
+                    return lu
+                if meilleur is None:
+                    meilleur = lu
+    return meilleur
 
 
 def _echelle(valeur, facteur):
