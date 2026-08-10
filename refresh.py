@@ -241,20 +241,24 @@ def collecte_brvm(avec_bilans=False):
               f"on conserve la version en cache")
         return 0
 
+    taux = fx.collecte(_devises())
     declares = set(brvm.tickers())
-    nouveaux, lus = [], 0
+    nouveaux, lus, capitalisees = [], 0, 0
     for societe in societes:
         societe["place"] = "brvm"
-        # Pas de nombre d'actions publié à jour, donc pas de capitalisation :
-        # les standards qui divisent par elle ne pourront pas conclure.
-        societe["market_cap_eur"] = None
+        societe["market_cap_eur"] = fx.en_euros(
+            societe.get("market_cap"), societe.get("currency"), taux
+        )
+        if societe.get("market_cap"):
+            capitalisees += 1
         if _bilan_brvm(societe, avec_bilans):
             lus += 1
         cache.save_detail(societe)
         if societe["ticker"] not in declares:
             nouveaux.append(societe["ticker"])
 
-    print(f"BRVM : {len(societes)} sociétés collectées")
+    print(f"BRVM : {len(societes)} sociétés collectées, "
+          f"{capitalisees} avec leur capitalisation")
     if avec_bilans:
         print(f"  {lus}/{len(brvm.FICHES)} bilans lus à la source")
     if nouveaux:

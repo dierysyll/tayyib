@@ -12,8 +12,8 @@ quatre continents. Paris reste la place de référence.
 
 Parmi elles, la **BRVM d'Abidjan**, place commune aux huit pays de l'UEMOA :
 absente de Yahoo Finance, elle est collectée directement à sa source — les
-cours sur la page de cotation, les comptes dans les états financiers que
-chaque société y dépose. C'est la seule place où un épargnant sénégalais ou
+cours et la capitalisation sur les pages de la Bourse, les comptes dans les
+états financiers que chaque société y dépose. C'est la seule place où un épargnant sénégalais ou
 ivoirien achète dans sa propre monnaie, et aucun autre screener halal ne la
 couvre.
 
@@ -181,11 +181,6 @@ titres, de sorte que le site sert un univers qui grandit pendant la collecte.
 
 - Le **filtre des 5 %** n'est pas calculable (voir plus haut). C'est la
   principale limite, et elle est structurelle.
-- Sur la **BRVM**, la **capitalisation boursière** est inconnue : la source
-  ne publie aucun nombre d'actions à jour, celui de ses fiches émetteurs
-  datant de 2015. Les trois standards qui divisent par elle — AAOIFI, Dow
-  Jones, S&P Shariah — ne peuvent donc pas conclure sur cette place, là où
-  MSCI Islamic, FTSE Shariah et SC Malaisie tranchent normalement.
 - Les **bilans de la BRVM** sont lus dans les PDF déposés par les émetteurs,
   et 26 des 28 sociétés que le secteur ne tranche pas d'emblée sont
   couvertes. Les deux dernières — NEI-CEDA et TotalEnergies Marketing

@@ -30,14 +30,20 @@ fois l'an, et les redemander quotidiennement serait aussi inutile que
 malpoli envers la source. `data/bilans.py` en tire les quatre grandeurs
 du screening ; ce module se charge de trouver le bon document.
 
-Ce que la source ne donne pas
------------------------------
-Aucun **nombre d'actions** à jour : les fiches émetteurs en publient un,
-arrêté en 2015, qu'il serait imprudent d'utiliser. Sans lui, pas de
-capitalisation boursière, donc pas de verdict selon les standards qui
-divisent par elle — AAOIFI, Dow Jones, S&P Shariah. Les trois autres —
-MSCI Islamic, FTSE Shariah, SC Malaisie — rapportent les montants au
-total du bilan et concluent normalement.
+Où trouver la capitalisation
+----------------------------
+Les fiches émetteurs publient un nombre d'actions arrêté en 2015, qu'il
+serait imprudent d'utiliser — nous en avions d'abord conclu que la
+capitalisation était hors d'atteinte, et que la moitié des standards ne
+pourraient jamais conclure sur cette place. C'était faux : la BRVM tient
+une page de capitalisations à jour, qui donne pour chaque société son
+nombre de titres, son cours et sa capitalisation globale. Les trois
+grandeurs sont cohérentes entre elles au franc près sur les 47 valeurs,
+ce que `capitalisations()` revérifie à chaque collecte.
+
+Avec elle, les six standards concluent ici comme ailleurs : ceux qui
+divisent par la capitalisation boursière — AAOIFI, Dow Jones, S&P
+Shariah — comme ceux qui divisent par le total du bilan.
 
 Sur la classification sectorielle
 ---------------------------------
@@ -58,6 +64,7 @@ import urllib.request
 from data import bilans, cache
 
 COTATIONS = "https://www.brvm.org/fr/cours-actions/0"
+CAPITALISATIONS = "https://www.brvm.org/fr/capitalisations/0"
 FICHE = "https://www.brvm.org/fr/rapports-societe-cotes/"
 
 ENTETES = {
@@ -244,19 +251,74 @@ def cotations():
     return lignes
 
 
+def _cellules(tableau):
+    """Les lignes d'un tableau HTML, cellules nettoyées, en-tête écarté."""
+    for tr in re.findall(r"<tr.*?</tr>", tableau, re.S)[1:]:
+        cellules = [
+            re.sub(r"\s+", " ", html.unescape(BALISES.sub(" ", c))).strip()
+            for c in re.findall(r"<td.*?</td>", tr, re.S)
+        ]
+        cellules = [c for c in cellules if c]
+        if cellules:
+            yield cellules
+
+
+def capitalisations():
+    """Nombre de titres et capitalisation boursière, par symbole.
+
+    La page des capitalisations publie les deux, ainsi que le cours qui les
+    relie. Nous vérifions que le produit retombe sur le total annoncé et
+    écartons la ligne sinon : trois grandeurs liées par une multiplication
+    forment un contrôle gratuit, et une capitalisation fausse déplacerait
+    silencieusement le verdict des standards qui divisent par elle.
+    """
+    requete = urllib.request.Request(CAPITALISATIONS, headers=ENTETES)
+    with urllib.request.urlopen(requete, timeout=30) as reponse:
+        page = reponse.read().decode("utf-8", "ignore")
+
+    tableaux = [t for t in re.findall(r"<table.*?</table>", page, re.S)
+                if "Nombre de titres" in t]
+    if not tableaux:
+        return {}
+
+    resultat = {}
+    for cellules in _cellules(tableaux[0]):
+        if len(cellules) < 6:
+            continue
+        symbole = cellules[0].strip().upper()
+        titres, cours = _nombre(cellules[2]), _nombre(cellules[3])
+        capitalisation = _nombre(cellules[5])
+        if not (titres and cours and capitalisation):
+            continue
+        if abs(titres * cours - capitalisation) > max(1, capitalisation * 1e-6):
+            continue
+        resultat[symbole] = {"actions": titres, "market_cap": capitalisation}
+    return resultat
+
+
 def societes():
     """Toutes les sociétés cotées, au format du reste de l'application.
 
-    Le dictionnaire produit est celui de `data/yahoo.py`, aux champs de
-    bilan près : ils restent à None tant que l'extracteur SYSCOHADA
-    n'existe pas, et le moteur conclut alors « à vérifier » — sauf pour
-    les activités que le filtre sectoriel écarte d'emblée.
+    Le dictionnaire produit est celui de `data/yahoo.py`. Les postes de
+    bilan restent à None ici : ils viennent des états financiers, que
+    `bilan()` lit à la demande et que la collecte attache ensuite.
+
+    Deux requêtes : la cote pour les cours, la page des capitalisations
+    pour le nombre de titres. Si la seconde échoue, les cours sont servis
+    quand même — une capitalisation manquante coûte trois standards sur
+    six, une cote manquante coûte la place entière.
     """
+    try:
+        capis = capitalisations()
+    except Exception:
+        capis = {}
+
     resultat = []
     for ligne in cotations():
         secteur, industrie, pays = SOCIETES.get(
             ligne["symbole"], (None, None, None)
         )
+        capi = capis.get(ligne["symbole"], {})
         resultat.append({
             "ticker": ligne["symbole"] + SUFFIXE,
             "nom": ligne["nom"].title(),
@@ -268,14 +330,15 @@ def societes():
             "cloture_precedente": ligne["cloture_precedente"],
             "variation": ligne["variation"],
             "volume": ligne["volume"],
-            # Sans nombre d'actions publié, la capitalisation reste inconnue :
-            # les standards qui divisent par elle ne pourront pas conclure.
-            "market_cap": None,
+            "market_cap": capi.get("market_cap"),
             "dividende_par_action": None,
             "rendement": None,
             "site": None,
             "resume": None,
-            "valorisation": {},
+            # Le nombre de titres se déduit ailleurs de la capitalisation
+            # divisée par le cours ; on le conserve tel que la source le
+            # publie, puisqu'ici il est donné et non reconstitué.
+            "valorisation": {"actions": capi.get("actions")} if capi else {},
             "total_debt": None,
             "cash_and_investments": None,
             "receivables": None,
