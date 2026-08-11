@@ -36,6 +36,7 @@ import random
 import sys
 import threading
 import time
+from datetime import datetime, timezone
 
 from data import brvm, cache, fx, presse, universe, yahoo
 
@@ -195,6 +196,37 @@ CHAMPS_BILAN = (
 )
 
 
+def _archiver_cours(societe):
+    """Ajoute la clôture du jour à la série de la valeur.
+
+    La BRVM ne publie pas d'historique. Ses Bulletins Officiels de la Cote
+    portent bien la cote complète d'une journée, mais le site n'en garde
+    qu'une dizaine en ligne : il n'existe aucun moyen de reconstituer le
+    passé. La seule série possible est celle qu'on se constitue soi-même,
+    un point par jour, à partir de maintenant.
+
+    D'où l'ordre de grandeur : une valeur d'Abidjan n'aura pas de courbe
+    avant plusieurs semaines de collecte, et chaque jour sans collecte est
+    un point définitivement perdu.
+
+    La date est celle de la collecte et non celle de la séance. Un
+    rafraîchissement lancé deux fois le même jour remplace le point au lieu
+    d'en ajouter un second.
+    """
+    prix = societe.get("prix")
+    if not prix:
+        return
+
+    ancien = cache.detail(societe["ticker"]) or {}
+    serie = [p for p in (ancien.get("cours") or []) if isinstance(p, list) and len(p) == 2]
+    jour = datetime.now(timezone.utc).date().isoformat()
+
+    serie = [p for p in serie if p[0] != jour]
+    serie.append([jour, prix])
+    serie.sort(key=lambda p: p[0])
+    societe["cours"] = serie
+
+
 def _bilan_brvm(societe, relire):
     """Attache les comptes à une valeur d'Abidjan.
 
@@ -251,14 +283,19 @@ def collecte_brvm(avec_bilans=False):
         )
         if societe.get("market_cap"):
             capitalisees += 1
+        _archiver_cours(societe)
         if _bilan_brvm(societe, avec_bilans):
             lus += 1
         cache.save_detail(societe)
         if societe["ticker"] not in declares:
             nouveaux.append(societe["ticker"])
 
+    points = max((len(s.get("cours") or []) for s in societes), default=0)
     print(f"BRVM : {len(societes)} sociétés collectées, "
           f"{capitalisees} avec leur capitalisation")
+    print(f"  série de cours : {points} séance{'s' if points > 1 else ''} archivée"
+          f"{'s' if points > 1 else ''}"
+          + (" — la courbe apparaîtra après quelques jours" if points < 5 else ""))
     if avec_bilans:
         print(f"  {lus}/{len(brvm.FICHES)} bilans lus à la source")
     if nouveaux:

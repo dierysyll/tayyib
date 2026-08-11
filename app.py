@@ -606,11 +606,17 @@ def api_cours(ticker):
     if connu is None:
         abort(404)
 
-    points = cache.cours_journalier(connu["ticker"])
-    if points is None:
-        points = yahoo.fetch_cours_journalier(connu["ticker"])
-        if points:
-            cache.save_cours_journalier(connu["ticker"], points)
+    # Les places que nous collectons nous-mêmes ne sont pas chez Yahoo :
+    # l'y chercher échouerait à chaque ouverture de fiche, et la série que
+    # nous archivons jour après jour est déjà dans le détail.
+    if universe.PLACES.get(connu.get("place"), {}).get("source"):
+        points = None
+    else:
+        points = cache.cours_journalier(connu["ticker"])
+        if points is None:
+            points = yahoo.fetch_cours_journalier(connu["ticker"])
+            if points:
+                cache.save_cours_journalier(connu["ticker"], points)
 
     detail = cache.detail(connu["ticker"]) or {}
     return jsonify({
