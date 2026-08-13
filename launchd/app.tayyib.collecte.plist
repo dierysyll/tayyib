@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  La collecte quotidienne de la cote d'Abidjan.
+
+  Elle n'est pas un confort : la BRVM ne publie aucun historique de cours
+  et ne garde qu'une dizaine de bulletins en ligne. Chaque jour sans
+  collecte est un point de série perdu définitivement. C'est la seule
+  raison pour laquelle ce projet, par ailleurs entièrement local et
+  manuel, a besoin d'une tâche planifiée.
+
+  16 h 30, heure de Paris : la séance d'Abidjan est close depuis
+  longtemps (la BRVM cote le matin, UTC), et le Mac est en général
+  éveillé. `RunAtLoad` rattrape le jour même si la machine était éteinte
+  à l'heure dite.
+
+  Installer :  launchctl bootstrap gui/$UID ~/Library/LaunchAgents/app.tayyib.collecte.plist
+  Retirer   :  launchctl bootout gui/$UID/app.tayyib.collecte
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>app.tayyib.collecte</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__RACINE__/.venv/bin/python</string>
+    <string>__RACINE__/refresh.py</string>
+    <string>--brvm</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>__RACINE__</string>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>16</integer>
+    <key>Minute</key><integer>30</integer>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>__RACINE__/cache/collecte.log</string>
+  <key>StandardErrorPath</key>
+  <string>__RACINE__/cache/collecte.log</string>
+</dict>
+</plist>

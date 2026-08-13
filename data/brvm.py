@@ -57,9 +57,11 @@ même règle qu'une banque française.
 """
 
 import html
+import json
 import os
 import re
 import urllib.request
+from datetime import datetime, timezone
 
 from data import bilans, cache
 
@@ -193,6 +195,15 @@ EXERCICE = re.compile(r"exercices?\s*(?:\d{4}\s*(?:à|-|a)\s*)?(\d{4})", re.I)
 # Les PDF ne changent qu'une fois l'an : les garder sur disque évite de
 # redemander vingt méga-octets à la source à chaque collecte.
 DOSSIER_PDF = os.path.join(cache.CACHE_DIR, "brvm")
+
+# La série de cours, elle, ne vit pas dans le cache — et c'est délibéré.
+# Tout le reste du cache se reconstruit en relançant une collecte ; cette
+# série-là, non. La BRVM ne publie aucun historique et ne garde qu'une
+# dizaine de bulletins en ligne : un point perdu l'est définitivement.
+# Elle est donc rangée à côté du code, versionnée avec lui, et survit à un
+# `rm -rf cache/` comme à un changement de machine. Quelques kilo-octets
+# pour la seule donnée du projet qui soit vraiment irremplaçable.
+ARCHIVE_COURS = os.path.join(os.path.dirname(__file__), "cours_brvm.json")
 
 
 def _nombre(texte):
@@ -354,6 +365,49 @@ def societes():
 def tickers():
     """Les symboles déclarés, suffixés — l'univers que nous prétendons couvrir."""
     return [s + SUFFIXE for s in SOCIETES]
+
+
+def archive_cours():
+    """La série de cours accumulée jusqu'ici, par symbole suffixé."""
+    try:
+        with open(ARCHIVE_COURS, encoding="utf-8") as fichier:
+            return json.load(fichier)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def archiver_cours(societes, jour=None):
+    """Ajoute la clôture du jour à la série de chaque valeur.
+
+    La date est celle de la collecte, pas celle de la séance : la cote ne
+    la publie pas, et l'approximation reste juste tant qu'on collecte le
+    jour même. Deux passages le même jour remplacent le point au lieu d'en
+    empiler un second.
+
+    Les séries sont écrites en une fois, triées, avec une indentation :
+    ce fichier est suivi par git, et un diff lisible vaut mieux qu'une
+    seule ligne de trente kilo-octets qui change entièrement chaque jour.
+    """
+    jour = jour or datetime.now(timezone.utc).date().isoformat()
+    series = archive_cours()
+
+    for societe in societes:
+        prix = societe.get("prix")
+        if not prix:
+            societe["cours"] = series.get(societe["ticker"], [])
+            continue
+        serie = [p for p in series.get(societe["ticker"], [])
+                 if isinstance(p, list) and len(p) == 2 and p[0] != jour]
+        serie.append([jour, prix])
+        serie.sort(key=lambda point: point[0])
+        series[societe["ticker"]] = serie
+        societe["cours"] = serie
+
+    provisoire = ARCHIVE_COURS + ".tmp"
+    with open(provisoire, "w", encoding="utf-8") as fichier:
+        json.dump(series, fichier, ensure_ascii=False, indent=1, sort_keys=True)
+    os.replace(provisoire, ARCHIVE_COURS)
+    return max((len(s) for s in series.values()), default=0)
 
 
 def _sans_accents(texte):

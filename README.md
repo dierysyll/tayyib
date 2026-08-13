@@ -127,8 +127,10 @@ screening/
   analyses.py           lectures à l'échelle de l'univers entier
   vocabulaire.py        secteurs et industries traduits (FR/EN)
   alias.py              noms usuels et recherche sans accents
+launchd/                la collecte quotidienne de la BRVM
 data/
   universe.py           les places de marché et leurs valeurs
+  cours_brvm.json       la série de cours d'Abidjan, jour après jour
   yahoo.py              collecte (bilan daté + capitalisation + actualités)
   brvm.py               collecte directe de la cote d'Abidjan
   bilans.py             lecture des bilans SYSCOHADA et IFRS en PDF
@@ -156,11 +158,16 @@ Ajouter une valeur : un symbole dans la place correspondante de
 `data/universe.py`, puis `refresh.py`. Ajouter un standard : une entrée dans
 `STANDARDS`. Ajouter une place : une entrée dans `PLACES`, avec sa devise.
 
-## Lancer en local
+## Lancer
+
+Tayyib tourne **sur votre machine**, et nulle part ailleurs. Ce n'est pas une
+limite en attendant mieux : le site promet à son lecteur que son portefeuille
+et sa zakat ne quittent pas son navigateur, et il n'y a pas de façon plus
+simple de tenir cette promesse que de n'avoir aucun serveur.
 
 ```bash
 python -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python refresh.py     # collecte complète, ~1 h
+.venv/bin/python refresh.py     # collecte complète, ~15 min
 .venv/bin/python app.py         # http://localhost:5001
 ```
 
@@ -176,6 +183,27 @@ titres, de sorte que le site sert un univers qui grandit pendant la collecte.
 .venv/bin/python refresh.py --actus                # seulement le fil d'actualité
 .venv/bin/python refresh.py --index                # réécrire l'index depuis le disque
 ```
+
+### La seule chose qui doit tourner tous les jours
+
+Tout le cache se reconstruit en relançant une collecte — sauf la **série de
+cours de la BRVM**. La Bourse d'Abidjan ne publie aucun historique et ne garde
+qu'une dizaine de bulletins en ligne : un jour non collecté est un point perdu
+définitivement, et la courbe d'une valeur d'Abidjan se construit à partir de
+maintenant, pas rétroactivement.
+
+C'est la seule raison pour laquelle ce projet, par ailleurs entièrement manuel,
+a besoin d'une tâche planifiée :
+
+```bash
+./launchd/installer.sh            # 16 h 30, tous les jours
+./launchd/installer.sh --etat     # vérifier qu'elle tourne
+./launchd/installer.sh --retirer  # désinstaller
+```
+
+Pour la même raison, cette série ne vit pas dans `cache/`, qui est ignoré par
+git : elle est écrite dans `data/cours_brvm.json`, versionnée avec le code.
+Quelques kilo-octets, mais les seuls que rien ne permettrait de retrouver.
 
 ## Limites connues
 
