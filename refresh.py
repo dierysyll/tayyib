@@ -37,7 +37,7 @@ import sys
 import threading
 import time
 
-from data import brvm, cache, fx, presse, universe, yahoo
+from data import brvm, cache, fx, presse, sukuk, universe, yahoo
 
 TRAVAILLEURS = 3      # requêtes simultanées vers Yahoo
 PAUSE = 0.35          # secondes entre deux départs, par travailleur
@@ -260,6 +260,17 @@ def collecte_brvm(avec_bilans=False):
         cache.save_detail(societe)
         if societe["ticker"] not in declares:
             nouveaux.append(societe["ticker"])
+
+    # Les sukuk viennent d'une autre page de la même Bourse : autant les
+    # relire pendant qu'on y est. Leur absence n'empêche pas la collecte.
+    try:
+        titres, obligations = sukuk.collecte()
+        cache.save_sukuk(titres, obligations)
+        vivants = sum(1 for t in titres if not t["echu"])
+        print(f"  sukuk : {len(titres)} cotés sur {obligations} lignes "
+              f"obligataires, dont {vivants} non échu{'s' if vivants > 1 else ''}")
+    except Exception as exc:
+        print(f"  sukuk : relecture impossible ({type(exc).__name__})")
 
     print(f"BRVM : {len(societes)} sociétés collectées, "
           f"{capitalisees} avec leur capitalisation")

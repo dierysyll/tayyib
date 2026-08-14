@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% from "icones.html" import icone, pays %}
+{% block titre %}Sukuk{% endblock %}
+{% block description %}Les sukuk cotés à la BRVM : les seuls titres de taux licites d'Afrique de l'Ouest, distingués des 264 obligations classiques de la cote.{% endblock %}
+
+{% block contenu %}
+<main class="page">
+
+  <h1 class="titre-page">Sukuk d'Afrique de l'Ouest</h1>
+  <p class="chapeau">
+    La BRVM cote {{ obligations }} lignes obligataires. {{ titres | length }} sont
+    des <strong>sukuk</strong> — des certificats adossés à un actif réel, émis par
+    des États de la zone. Toutes les autres sont des obligations classiques, qui
+    versent un intérêt. Distinguer les unes des autres est tout l'objet de cette
+    page.
+  </p>
+
+  <div class="encart">
+    <p><strong>Ce que nous affirmons, et ce que nous n'affirmons pas.</strong>
+    Notre affirmation est étroite et vérifiable : sur les {{ obligations }} lignes
+    de la cote obligataire, la Bourse en présente {{ titres | length }} comme des
+    sukuk, et {{ obligations - (titres | length) }} comme des emprunts à intérêt.
+    Le tri ne demande aucune compétence religieuse, et personne ne le publie en
+    Afrique de l'Ouest.</p>
+    <p>Nous ne certifions rien de plus. Nous ne relisons pas la documentation
+    d'émission, nous n'évaluons pas la structure du montage, et nous ne nous
+    prononçons pas sur la conformité d'un titre en particulier. Ces sukuk ont été
+    structurés avec un conseil de conformité au moment de leur émission :
+    c'est cette parole-là qui engage, pas la nôtre.</p>
+  </div>
+
+  <div class="compteurs">
+    {% for cle, nb, lb, detail in [
+        ('conforme', vivants | length, 'Sukuk non échus',
+         'encore en circulation'),
+        ('a_verifier', echus | length, 'Arrivés à échéance',
+         'conservés pour mémoire'),
+        ('non_conforme', obligations - (titres | length), 'Obligations à intérêt',
+         'écartées sans examen'),
+        ('tous', obligations, 'Lignes cotées', "l'ensemble du compartiment")
+    ] %}
+      <div class="compteur c-{{ cle }}">
+        <div class="compteur-nb num">{{ nb }}</div>
+        <div class="compteur-lb">{{ lb }}</div>
+        <div class="compteur-part">{{ detail }}</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if titres %}
+    <h2 class="section">Les titres</h2>
+    <div class="cadre defilement">
+      <table class="t-sukuk">
+        <thead>
+          <tr>
+            <th>Titre</th>
+            <th>Émetteur</th>
+            <th class="a-droite">Taux facial</th>
+            <th class="a-droite">Période</th>
+            <th class="a-droite">Cours</th>
+            <th class="a-droite">Coupon couru</th>
+            <th>Dernier coupon versé</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in titres %}
+            <tr>
+              <td>
+                <strong>{{ t.code }}</strong>
+                <div class="ticker">
+                  {% if t.echu %}
+                    <span class="verdict v-a_verifier">Échu</span>
+                  {% elif t.derniere_annee %}
+                    <span class="verdict v-a_verifier">Dernière année</span>
+                  {% else %}
+                    <span class="verdict v-conforme">En circulation</span>
+                  {% endif %}
+                </div>
+              </td>
+              <td>
+                {% if t.code_pays %}{{ pays(t.code_pays, 'monde-musulman') }}{% endif %}
+                {{ t.emetteur or '—' }}
+              </td>
+              <td class="a-droite num">
+                {{ t.taux | nombre(2) if t.taux is not none else '—' }} %
+              </td>
+              <td class="a-droite num">{{ t.debut }}–{{ t.fin }}</td>
+              <td class="a-droite num">{{ t.cours | nombre(0) if t.cours else '—' }} XOF</td>
+              <td class="a-droite num">
+                {{ t.coupon_couru | nombre(2) if t.coupon_couru else '—' }}
+              </td>
+              <td class="num">
+                {% if t.dernier_paiement %}
+                  {{ t.dernier_paiement.date }}
+                  <span class="ticker">{{ t.dernier_paiement.montant | nombre(2) }} XOF</span>
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="provenance">
+      La Bourse laisse vide la colonne « date de maturité » des cinq titres, et
+      affiche pour tous la même date d'émission — celle de leur saisie, pas celle
+      des émissions, dont deux sont antérieures. L'échéance lue ici vient donc de
+      l'intitulé du titre, qui porte sa période ; elle n'est connue qu'à l'année
+      près, et un titre de l'année en cours est signalé plutôt que déclaré échu.
+      {% if fetched_at %}Relevé du {{ fetched_at | date_fr }}.{% endif %}
+    </p>
+  {% else %}
+    <div class="cadre">
+      <p class="vide">
+        Aucun sukuk en cache. Lancez <code>refresh.py --brvm</code> pour
+        interroger la Bourse.
+      </p>
+    </div>
+  {% endif %}
+
+  <h2 class="section">Pourquoi ces titres ne passent pas par le screener</h2>
+  <div class="encart encart-neutre">
+    <p>Les six standards de ce site trient des <strong>actions</strong>. Une
+    action est une part d'entreprise : on examine son activité, puis on rapporte
+    sa dette et sa trésorerie à sa taille. Un sukuk n'est rien de tout cela — il
+    n'a ni activité propre, ni bilan, ni capitalisation. Lui appliquer un ratio
+    de dette n'aurait aucun sens, et afficher un verdict « conforme » calculé de
+    cette façon serait une tromperie.</p>
+    <p>Sa licéité se joue ailleurs : dans la <em>structure</em> du montage —
+    ijara, murabaha, wakala — et dans l'existence d'un actif réel derrière le
+    certificat. Cela s'examine dans la documentation d'émission, par un savant,
+    pas par un programme.</p>
+  </div>
+
+  <div class="encart">
+    <p><strong>Un gisement mince, et qui se referme.</strong>
+    {% if vivants %}
+      {{ vivants | length }} titre{{ 's' if vivants | length > 1 }} seulement
+      {{ "sont" if vivants | length > 1 else "est" }} encore en circulation, et
+      {{ "ils arrivent" if vivants | length > 1 else "il arrive" }} à échéance
+      cette année.
+    {% else %}
+      Aucun des sukuk listés n'est encore en circulation.
+    {% endif %}
+    Les États de la zone réémettent régulièrement, mais il n'y a pas, à ce jour,
+    de marché profond du sukuk en franc CFA. Cette page dit ce qui existe, sans
+    faire croire à une offre qui n'est pas là.</p>
+  </div>
+
+</main>
+{% endblock %}

@@ -16,7 +16,7 @@ from urllib.parse import quote
 from flask import Flask, abort, jsonify, render_template, request
 
 import charts
-from data import cache, fx, presse, universe, yahoo
+from data import cache, fx, presse, sukuk as sukuk_brvm, universe, yahoo
 from screening import (alias, analyses, bascule, engine, notation, standards,
                        vocabulaire)
 
@@ -803,6 +803,28 @@ def api_univers():
             for e in evaluees
         ],
     })
+
+
+@app.route("/sukuk")
+def sukuk():
+    """Les sukuk cotés à la BRVM.
+
+    Une page à part, et non une place de plus dans le screener : un sukuk
+    n'est pas une part d'entreprise, il n'a ni activité à filtrer ni bilan
+    à passer aux ratios. Les six standards ne s'y appliquent pas, et le
+    prétendre serait pire que de ne rien dire.
+    """
+    titres, obligations, collecte = cache.sukuk()
+    return render_template(
+        "sukuk.html",
+        titres=titres,
+        obligations=obligations,
+        vivants=[t for t in titres if not t["echu"]],
+        echus=[t for t in titres if t["echu"]],
+        standard=standards.get(_standard_demande()),
+        standards=standards.STANDARDS,
+        fetched_at=collecte,
+    )
 
 
 @app.route("/methodologie")

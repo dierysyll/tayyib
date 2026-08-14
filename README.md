@@ -45,6 +45,12 @@ Autour du screener, quatre rubriques :
 - **Actualités** — un fil agrégé, avec le verdict attaché à chaque société
   citée. C'est la rubrique la plus faible des quatre, et la page le dit.
 
+À part, un **compartiment sukuk**. La BRVM cote 269 lignes obligataires, dont
+cinq sont des sukuk et 264 des emprunts à intérêt. Les trier ne demande aucune
+compétence religieuse et personne ne le fait en Afrique de l'Ouest ; c'est donc
+fait ici. Ces titres ne passent pas par le screener — un sukuk n'a ni activité
+ni bilan, et lui appliquer un ratio de dette n'aurait pas de sens.
+
 ## Le parti pris : ne jamais transformer une incertitude en verdict
 
 C'est ce qui distingue Tayyib de ses concurrents, et c'est un choix de
@@ -131,6 +137,7 @@ launchd/                la collecte quotidienne de la BRVM
 data/
   universe.py           les places de marché et leurs valeurs
   cours_brvm.json       la série de cours d'Abidjan, jour après jour
+  sukuk.py              les sukuk du compartiment obligataire d'Abidjan
   yahoo.py              collecte (bilan daté + capitalisation + actualités)
   brvm.py               collecte directe de la cote d'Abidjan
   bilans.py             lecture des bilans SYSCOHADA et IFRS en PDF

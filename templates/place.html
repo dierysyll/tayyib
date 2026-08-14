@@ -26,6 +26,16 @@
   {% if place.note %}
     <div class="encart encart-info">
       <p><strong>À savoir sur cette place.</strong> {{ place.note }}</p>
+      {#- Le compartiment obligataire d'Abidjan porte cinq sukuk, seuls titres
+          de taux licites de la cote. Ils ne passent pas par le screener — ce
+          ne sont pas des actions — et n'ont donc aucune raison d'apparaître
+          dans les tableaux ci-dessous. Reste à le dire ici. -#}
+      {% if place.id == 'brvm' %}
+        <p>Cette Bourse cote aussi un compartiment obligataire, dont
+        <a href="{{ url_for('sukuk') }}">cinq lignes sont des sukuk</a> et non des
+        emprunts à intérêt. Ils sont recensés à part : un sukuk n'est pas une
+        part d'entreprise, et les standards de screening ne s'y appliquent pas.</p>
+      {% endif %}
     </div>
   {% endif %}
 

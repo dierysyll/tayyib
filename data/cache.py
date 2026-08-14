@@ -285,6 +285,35 @@ def actus():
 # deux n'ont ni la même source, ni la même fraîcheur, ni le même usage.
 PRESSE_FILE = os.path.join(CACHE_DIR, "presse.json")
 
+# --- Sukuk de la BRVM ----------------------------------------------------
+#
+# Cinq titres sur une place, relus à chaque collecte d'Abidjan. C'est peu,
+# mais ils viennent d'une page distincte de celle des actions et n'ont
+# aucun champ en commun avec elles : leur propre fichier plutôt qu'un coin
+# de l'index.
+SUKUK_FILE = os.path.join(CACHE_DIR, "sukuk.json")
+
+
+def save_sukuk(titres, total):
+    _ensure_dirs()
+    _ecrire(SUKUK_FILE, {
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "titres": titres,
+        "obligations": total,
+    })
+    return SUKUK_FILE
+
+
+def sukuk():
+    """Renvoie (titres, total obligataire, fetched_at)."""
+    try:
+        with open(SUKUK_FILE, encoding="utf-8") as f:
+            payload = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return [], 0, None
+    return (payload.get("titres", []), payload.get("obligations", 0),
+            _date(payload.get("fetched_at")))
+
 
 def save_presse(articles):
     _ensure_dirs()
