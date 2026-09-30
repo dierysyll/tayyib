@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "icones.html" import icone, pays %}
 {% block titre %}{{ societe.nom }}{% endblock %}
 
 {% block contenu %}
@@ -8,17 +9,552 @@
 
   <div class="fiche-tete">
     <div>
+      {% if place %}
+        <p class="place-tag" style="margin:0 0 8px">
+          <span class="place-pip p-{{ place.region }}"></span>
+          {{ pays(place.code, place.region) }}
+          {{ place.nom }} · {{ place.indice }}
+        </p>
+      {% endif %}
       <h1 class="fiche-titre">{{ societe.nom }}</h1>
       <p class="fiche-sous num">
         {{ societe.ticker }}
         {%- if societe.industry %} · {{ societe.industry }}{% endif %}
-        {%- if societe.market_cap %} · {{ societe.market_cap | montant }} {{ societe.currency or '' }}{% endif %}
+        {%- if societe.market_cap %} · {{ societe.market_cap | montant }} {{ societe.currency or '' }}
+          {%- if societe.market_cap_eur and societe.currency != 'EUR' %}
+            <span style="color:var(--texte-faible)">({{ societe.market_cap_eur | euros }})</span>
+          {%- endif %}
+        {%- endif %}
       </p>
     </div>
-    <span class="verdict v-{{ resultat.verdict }}">{{ engine.VERDICT_LABELS[resultat.verdict] }} — {{ standard.label }}</span>
+    <div class="fiche-cours">
+      {% if societe.prix %}
+        <div class="cours-prix num">{{ societe.prix | nombre }} {{ societe.currency or '' }}</div>
+      {% endif %}
+      <span class="verdict v-{{ resultat.verdict }}">{{ engine.VERDICT_LABELS[resultat.verdict] }} — {{ standard.label }}</span>
+    </div>
   </div>
 
   <div class="motif m-{{ resultat.verdict }}">{{ resultat.raison }}</div>
+
+  {% if bascule_cours %}
+    <div class="encart">
+      <p><strong>Ce verdict tient au cours, pas aux comptes.</strong>
+      {{ standard.label }} rapporte la dette à la <em>capitalisation boursière</em>.
+      Au dernier arrêté du {{ bascule_cours.date | date_fr }}, avec un cours de
+      {{ bascule_cours.cours_arrete | nombre }} {{ societe.currency }}, cette valeur
+      était <strong>{{ engine.VERDICT_LABELS[bascule_cours.verdict_arrete] | lower }}</strong>.
+      Le cours est depuis à {{ bascule_cours.cours_actuel | nombre }} {{ societe.currency }},
+      ce qui fait passer le ratio de l'autre côté du seuil — sans que rien n'ait changé
+      dans l'entreprise.</p>
+      <p>C'est bien ce que dit le standard, et non un défaut de calcul. Mais la
+      conclusion est <strong>réversible</strong> : une baisse du cours la renverserait.
+      Les standards qui rapportent au total du bilan — MSCI, FTSE, SC Malaisie — ne
+      connaissent pas ce cas, et le tableau de comparaison plus bas montre ce qu'ils
+      concluent.</p>
+    </div>
+  {% endif %}
+  {# --- Cours et conformité, sur le même axe -------------------------
+
+     Le graphique porte trois informations superposées, et c'est le
+     recouvrement qui fait sa valeur : le cours, les arrêtés comptables, et
+     le verdict de chaque exercice. Une courbe seule ne dirait qu'une
+     tendance ; ici on voit à quel niveau de cours l'entreprise était
+     conforme, et à partir de quand elle a cessé de l'être. #}
+  {% if graphique %}
+    <div class="graphique-tete">
+      <div>
+        <h2 class="section" style="margin:0">
+          Cours
+          <span class="section-note num {{ 'hausse' if graphique.variation >= 0 else 'baisse' }}"
+                id="variation">{{ graphique.variation | signe }}</span>
+        </h2>
+        <p class="graphique-periode" id="periode-lue"></p>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button type="button" class="bouton bouton-fantome" id="zoom-reset" hidden>
+          Réinitialiser le zoom
+        </button>
+        <div class="periodes" id="periodes">
+          <button type="button" data-jours="30">1 M</button>
+          <button type="button" data-jours="180">6 M</button>
+          <button type="button" data-jours="365" class="on">1 an</button>
+          <button type="button" data-jours="1825">5 ans</button>
+          <button type="button" data-jours="0">Max</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="cadre graphique">
+      <div class="graphe-hote" id="graphe">
+        <noscript>
+          <svg viewBox="0 0 {{ graphique.largeur }} {{ graphique.hauteur }}" preserveAspectRatio="none" class="courbe">
+            <path d="{{ graphique.ligne }}" class="trait" fill="none" vector-effect="non-scaling-stroke"/>
+          </svg>
+          <p class="graphique-note">Le détail interactif du cours demande JavaScript.</p>
+        </noscript>
+      </div>
+
+      {#- La mini-carte : toute la période en petit, avec une fenêtre
+          déplaçable et deux poignées. C'est ce qui manquait — un zoom qui
+          ne se voit pas n'existe pas. -#}
+      <div class="minicarte" id="minicarte" hidden>
+        <svg class="minicarte-fond" id="minicarte-fond" viewBox="0 0 1000 60" preserveAspectRatio="none"></svg>
+        <div class="minicarte-voile" id="voile-gauche"></div>
+        <div class="minicarte-voile" id="voile-droit"></div>
+        <div class="minicarte-fenetre" id="fenetre">
+          <span class="poignee poignee-g"></span>
+          <span class="poignee poignee-d"></span>
+        </div>
+      </div>
+      <p class="minicarte-aide">
+        Glissez les poignées pour resserrer la période, ou déplacez la fenêtre
+        pour la faire coulisser. La molette fonctionne aussi sur le graphique.
+      </p>
+
+      <div class="graphique-legende" id="legende-verdicts">
+        <span class="leg leg-conforme">Exercice conforme</span>
+        <span class="leg leg-a_verifier">À vérifier</span>
+        <span class="leg leg-non_conforme">Non conforme</span>
+      </div>
+
+      <p class="graphique-note">
+        Les pastilles marquent chaque arrêté comptable, coloriées selon le verdict
+        {{ standard.label }} de l'exercice. C'est la même donnée que le tableau
+        ci-dessous, lue sur l'axe du cours : on voit à quel niveau de valorisation
+        la société était conforme, et quand elle a cessé de l'être.
+      </p>
+    </div>
+
+    <script>
+    // Graphique de cours. Tout est dessiné ici plutôt que servi en SVG figé,
+    // parce qu'un graphique qu'on ne peut ni recadrer ni interroger n'apprend
+    // rien : on veut lire une date, un montant, et situer les arrêtés.
+    (function () {
+      var TICKER = {{ societe.ticker | tojson }},
+          DEVISE = {{ (societe.currency or '') | tojson }},
+          JALONS = {{ (historique | map(attribute='date') | list) | tojson }},
+          VERDICTS = {{ (historique | map(attribute='verdict') | list) | tojson }};
+
+      var hote = document.getElementById('graphe'),
+          barre = document.getElementById('periodes'),
+          variation = document.getElementById('variation'),
+          periodeLue = document.getElementById('periode-lue');
+
+      if (!hote || !barre) return;
+
+      // Marges : sans elles, les libellés d'axe n'ont nulle part où aller.
+      var L = 1000, H = 340, MG = 8, MD = 62, MH = 14, MB = 52;
+      var donnees = null, jours = 365;
+
+      var MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
+                  'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+      function nb(v, d) {
+        return v.toLocaleString('fr-FR', {minimumFractionDigits: d, maximumFractionDigits: d});
+      }
+      function dateCourte(iso) {
+        var p = iso.split('-');
+        return MOIS[+p[1] - 1] + ' ' + p[0].slice(2);
+      }
+      function dateLongue(iso) {
+        var p = iso.split('-');
+        return +p[2] + ' ' + MOIS[+p[1] - 1].replace('.', '') + ' ' + p[0];
+      }
+
+      // Une échelle qui tombe sur des valeurs rondes : « 480 » se lit,
+      // « 483,27 » ne se lit pas.
+      function graduations(bas, haut, combien) {
+        var brut = (haut - bas) / combien;
+        var magnitude = Math.pow(10, Math.floor(Math.log10(brut)));
+        var pas = [1, 2, 2.5, 5, 10].map(function (m) { return m * magnitude; })
+                    .find(function (p) { return p >= brut; }) || magnitude * 10;
+        var g = [], v = Math.ceil(bas / pas) * pas;
+        for (; v <= haut; v += pas) g.push(v);
+        return g;
+      }
+
+      function dessine(points) {
+        if (!points || points.length < 2) return;
+
+        var vals = points.map(function (p) { return p[1]; });
+        var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+        var marge = (max - min) * 0.12 || 1;
+        // Un cours ne descend pas sous zéro : sans ce plancher, la marge
+        // basse fabriquait une graduation « −0,00 » dénuée de sens.
+        var bas = Math.max(0, min - marge), haut = max + marge;
+
+        var x = function (i) { return MG + (i / (points.length - 1)) * (L - MG - MD); };
+        var y = function (v) { return MH + (1 - (v - bas) / (haut - bas)) * (H - MH - MB); };
+
+        var svg = ['<svg viewBox="0 0 ' + L + ' ' + H + '" class="courbe" role="img" ' +
+                   'aria-label="Cours de la valeur sur la période choisie">'];
+
+        svg.push('<defs><linearGradient id="degrade" x1="0" y1="0" x2="0" y2="1">' +
+                 '<stop offset="0%" class="deg-haut"/><stop offset="100%" class="deg-bas"/>' +
+                 '</linearGradient></defs>');
+
+        // Grille horizontale et prix, à droite pour ne pas décaler la courbe.
+        graduations(bas, haut, 4).forEach(function (v) {
+          svg.push('<line class="grille" x1="' + MG + '" x2="' + (L - MD) + '" y1="' + y(v).toFixed(1) +
+                   '" y2="' + y(v).toFixed(1) + '"/>');
+          var val = Math.abs(v) < 1e-9 ? 0 : v;
+          svg.push('<text class="axe-y" x="' + (L - MD + 9) + '" y="' + (y(v) + 4).toFixed(1) + '">' +
+                   nb(val, val > 0 && val < 10 ? 2 : 0) + '</text>');
+        });
+
+        // Dates : cinq repères suffisent, au-delà ils se chevauchent.
+        var nbDates = Math.min(5, points.length);
+        for (var k = 0; k < nbDates; k++) {
+          var i = Math.round(k * (points.length - 1) / (nbDates - 1 || 1));
+          svg.push('<text class="axe-x" x="' + x(i).toFixed(1) + '" y="' + (H - 8) +
+                   '" text-anchor="' + (k === 0 ? 'start' : k === nbDates - 1 ? 'end' : 'middle') +
+                   '">' + dateCourte(points[i][0]) + '</text>');
+        }
+
+        var chemin = points.map(function (p, i) {
+          return (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p[1]).toFixed(1);
+        }).join(' ');
+        svg.push('<path d="' + chemin + ' L' + x(points.length - 1).toFixed(1) + ' ' + (H - MB) +
+                 ' L' + MG + ' ' + (H - MB) + ' Z" fill="url(#degrade)"/>');
+        svg.push('<path d="' + chemin + '" class="trait" fill="none" vector-effect="non-scaling-stroke"/>');
+
+        // Plus haut et plus bas : deux points qu'on cherche toujours.
+        [[vals.indexOf(max), 'haut'], [vals.indexOf(min), 'bas']].forEach(function (e) {
+          var i = e[0];
+          svg.push('<circle class="extremum" cx="' + x(i).toFixed(1) + '" cy="' + y(points[i][1]).toFixed(1) + '" r="3.5"/>');
+          svg.push('<text class="etiq-extremum" x="' + x(i).toFixed(1) + '" y="' +
+                   (y(points[i][1]) + (e[1] === 'haut' ? -10 : 18)).toFixed(1) + '" text-anchor="middle">' +
+                   nb(points[i][1], 2) + '</text>');
+        });
+
+        // Les arrêtés comptables, coloriés par verdict : c'est ce qui
+        // distingue ce graphique de n'importe quel graphique boursier.
+        var reperes = 0;
+        JALONS.forEach(function (iso, n) {
+          var i = points.findIndex(function (p) { return p[0] >= iso; });
+          if (i < 1) return;
+          reperes++;
+          svg.push('<line class="repere-tige rv-' + VERDICTS[n] + '" x1="' + x(i).toFixed(1) +
+                   '" x2="' + x(i).toFixed(1) + '" y1="' + y(points[i][1]).toFixed(1) +
+                   '" y2="' + (H - MB) + '" vector-effect="non-scaling-stroke"/>');
+          svg.push('<circle class="repere rv-' + VERDICTS[n] + '" cx="' + x(i).toFixed(1) +
+                   '" cy="' + y(points[i][1]).toFixed(1) + '" r="5.5"/>');
+          svg.push('<text class="etiq-repere" x="' + x(i).toFixed(1) + '" y="' + (H - MB + 16) +
+                   '" text-anchor="middle">' + iso.slice(0, 4) + '</text>');
+        });
+        document.getElementById('legende-verdicts').hidden = reperes === 0;
+
+        // Curseur de lecture.
+        svg.push('<line id="viseur" class="viseur" y1="' + MH + '" y2="' + (H - MB) + '" style="display:none"/>');
+        svg.push('<circle id="viseur-point" class="viseur-point" r="4" style="display:none"/>');
+        svg.push('<rect id="zone" x="' + MG + '" y="' + MH + '" width="' + (L - MG - MD) +
+                 '" height="' + (H - MH - MB) + '" fill="transparent"/>');
+        svg.push('</svg>');
+
+        hote.innerHTML = svg.join('') +
+          '<div class="infobulle" id="infobulle" hidden></div>';
+
+        var ecart = (points[points.length - 1][1] - points[0][1]) / points[0][1];
+        variation.textContent = (ecart >= 0 ? '+' : '−') + nb(Math.abs(ecart) * 100, 1) + ' %';
+        variation.className = 'section-note num ' + (ecart >= 0 ? 'hausse' : 'baisse');
+        periodeLue.textContent = 'du ' + dateLongue(points[0][0]) + ' au ' + dateLongue(points[points.length - 1][0]);
+
+        brancheCurseur(points, x, y);
+      }
+
+      function brancheCurseur(points, x, y) {
+        var svg = hote.querySelector('svg'),
+            viseur = hote.querySelector('#viseur'),
+            point = hote.querySelector('#viseur-point'),
+            bulle = hote.querySelector('#infobulle'),
+            zone = hote.querySelector('#zone');
+        if (!zone) return;
+
+        function lire(e) {
+          var r = svg.getBoundingClientRect();
+          var frac = (e.clientX - r.left) / r.width;
+          var i = Math.round(((frac * L) - MG) / (L - MG - MD) * (points.length - 1));
+          i = Math.max(0, Math.min(points.length - 1, i));
+
+          viseur.setAttribute('x1', x(i)); viseur.setAttribute('x2', x(i));
+          viseur.style.display = '';
+          point.setAttribute('cx', x(i)); point.setAttribute('cy', y(points[i][1]));
+          point.style.display = '';
+
+          bulle.hidden = false;
+          bulle.innerHTML = '<strong>' + nb(points[i][1], 2) + ' ' + DEVISE + '</strong>' +
+                            '<span>' + dateLongue(points[i][0]) + '</span>';
+          // L'infobulle suit le curseur mais reste dans le cadre.
+          var gauche = Math.min(Math.max(x(i) / L * r.width - 60, 4), r.width - 130);
+          bulle.style.left = gauche + 'px';
+        }
+
+        // Molette : raccourci de la mini-carte, sur les mêmes bornes.
+        //
+        // Deux défauts corrigés ici. La fraction se calcule sur la **zone
+        // de tracé**, pas sur toute la largeur du SVG : la marge de droite
+        // porte les prix, et l'ignorer décalait le centre du zoom vers la
+        // fin de la série — d'où l'impression que le graphique filait
+        // toujours vers la dernière période.
+        //
+        // Et le pas dépend de l'amplitude de la molette. Un facteur fixe de
+        // 0,8 par cran poussait au maximum en trois crans, ce qui rend le
+        // réglage fin impossible — surtout sur un pavé tactile, qui émet
+        // beaucoup d'événements de faible amplitude.
+        svg.addEventListener('wheel', function (e) {
+          e.preventDefault();
+          var r = svg.getBoundingClientRect();
+          var gauche = r.left + (MG / L) * r.width;
+          var largeurTrace = ((L - MG - MD) / L) * r.width;
+          var f = Math.max(0, Math.min(1, (e.clientX - gauche) / largeurTrace));
+
+          var centre = borne[0] + f * (borne[1] - borne[0]);
+          var pas = Math.min(Math.abs(e.deltaY), 60) / 60 * 0.16;
+          var largeur = (borne[1] - borne[0]) * (e.deltaY < 0 ? 1 - pas : 1 + pas);
+          largeur = Math.max(0.03, Math.min(1, largeur));
+
+          // On garde le point sous le curseur à sa place : c'est ce qui
+          // rend un zoom prévisible.
+          var g = Math.max(0, Math.min(1 - largeur, centre - f * largeur));
+          borne = [g, g + largeur];
+          majFenetre();
+          dessine(tranche());
+          majBoutonZoom();
+        }, {passive: false});
+
+        svg.addEventListener('mousemove', lire);
+        svg.addEventListener('touchmove', function (e) {
+          if (e.touches[0]) { lire(e.touches[0]); e.preventDefault(); }
+        }, {passive: false});
+        svg.addEventListener('mouseleave', function () {
+          viseur.style.display = 'none';
+          point.style.display = 'none';
+          bulle.hidden = true;
+        });
+      }
+
+      function fenetre(j) {
+        // Sous quinze mois, le pas journalier ; au-delà, l'hebdomadaire
+        // suffit et pèse trois fois moins.
+        var source = (j && j <= 460 && donnees.journalier.length)
+          ? donnees.journalier
+          : (donnees.hebdomadaire.length ? donnees.hebdomadaire : donnees.journalier);
+        if (!j) return source;
+        var limite = new Date();
+        limite.setDate(limite.getDate() - j);
+        var iso = limite.toISOString().slice(0, 10);
+        var coupe = source.filter(function (p) { return p[0] >= iso; });
+        return coupe.length > 1 ? coupe : source;
+      }
+
+      // --- Mini-carte ---------------------------------------------------
+      // Deux bornes en fraction de la série de base : [0, 1] montre tout.
+      var borne = [0, 1], glisse = null;
+
+      function serieBase() { return donnees ? fenetre(jours) : []; }
+
+      function tranche() {
+        var base = serieBase();
+        if (base.length < 2) return base;
+        var a = Math.floor(borne[0] * (base.length - 1));
+        var b = Math.ceil(borne[1] * (base.length - 1));
+        if (b - a < 2) b = Math.min(base.length - 1, a + 2);
+        return base.slice(a, b + 1);
+      }
+
+      function dessineMinicarte() {
+        var base = serieBase();
+        var carte = document.getElementById('minicarte');
+        if (base.length < 3) { carte.hidden = true; return; }
+        carte.hidden = false;
+
+        var vals = base.map(function (p) { return p[1]; });
+        var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+        var etendue = (max - min) || 1;
+        var chemin = base.map(function (p, i) {
+          return (i ? 'L' : 'M') + (i / (base.length - 1) * 1000).toFixed(1) + ' ' +
+                 (56 - ((p[1] - min) / etendue) * 50).toFixed(1);
+        }).join(' ');
+        document.getElementById('minicarte-fond').innerHTML =
+          '<path d="' + chemin + ' L1000 60 L0 60 Z" class="mc-aire"/>' +
+          '<path d="' + chemin + '" class="mc-trait" fill="none" vector-effect="non-scaling-stroke"/>';
+        majFenetre();
+      }
+
+      function majFenetre() {
+        var g = borne[0] * 100, d = borne[1] * 100;
+        document.getElementById('fenetre').style.left = g + '%';
+        document.getElementById('fenetre').style.width = (d - g) + '%';
+        document.getElementById('voile-gauche').style.width = g + '%';
+        document.getElementById('voile-droit').style.left = d + '%';
+        document.getElementById('voile-droit').style.width = (100 - d) + '%';
+      }
+
+      function fractionSous(clientX) {
+        var r = document.getElementById('minicarte').getBoundingClientRect();
+        return Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+      }
+
+      (function brancheMinicarte() {
+        var carte = document.getElementById('minicarte');
+        if (!carte) return;
+        var MIN = 0.04;  // largeur minimale de fenêtre, pour rester saisissable
+
+        carte.addEventListener('pointerdown', function (e) {
+          var cible = e.target;
+          var f = fractionSous(e.clientX);
+          if (cible.classList.contains('poignee-g')) glisse = {type: 'g'};
+          else if (cible.classList.contains('poignee-d')) glisse = {type: 'd'};
+          else if (cible.id === 'fenetre') glisse = {type: 'deplace', depart: f, borne0: borne.slice()};
+          else {
+            // Clic dans le vide : on recentre une fenêtre de même largeur.
+            var largeur = borne[1] - borne[0];
+            borne = [Math.max(0, f - largeur / 2), Math.min(1, f + largeur / 2)];
+            majFenetre(); dessine(tranche()); majBoutonZoom();
+            return;
+          }
+          carte.setPointerCapture(e.pointerId);
+          e.preventDefault();
+        });
+
+        carte.addEventListener('pointermove', function (e) {
+          if (!glisse) return;
+          var f = fractionSous(e.clientX);
+          if (glisse.type === 'g') borne[0] = Math.min(f, borne[1] - MIN);
+          else if (glisse.type === 'd') borne[1] = Math.max(f, borne[0] + MIN);
+          else {
+            var delta = f - glisse.depart;
+            var largeur = glisse.borne0[1] - glisse.borne0[0];
+            var g = Math.max(0, Math.min(1 - largeur, glisse.borne0[0] + delta));
+            borne = [g, g + largeur];
+          }
+          borne[0] = Math.max(0, borne[0]);
+          borne[1] = Math.min(1, borne[1]);
+          majFenetre();
+          dessine(tranche());
+        });
+
+        function fin(e) {
+          if (!glisse) return;
+          glisse = null;
+          try { carte.releasePointerCapture(e.pointerId); } catch (err) {}
+          majBoutonZoom();
+        }
+        carte.addEventListener('pointerup', fin);
+        carte.addEventListener('pointercancel', fin);
+      })();
+
+      function majBoutonZoom() {
+        var bouton = document.getElementById('zoom-reset');
+        if (bouton) bouton.hidden = borne[0] <= 0.001 && borne[1] >= 0.999;
+      }
+
+      function reinitialise() {
+        borne = [0, 1];
+        majFenetre();
+        dessine(tranche());
+        majBoutonZoom();
+      }
+
+      function affiche() {
+        borne = [0, 1];
+        majBoutonZoom();
+        if (donnees) { dessineMinicarte(); return dessine(tranche()); }
+        hote.classList.add('chargement');
+        fetch('/api/cours/' + encodeURIComponent(TICKER) + '.json')
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            donnees = d;
+            hote.classList.remove('chargement');
+            dessineMinicarte();
+            dessine(tranche());
+            var bouton = document.getElementById('zoom-reset');
+            if (bouton) bouton.addEventListener('click', reinitialise);
+          })
+          .catch(function () {
+            hote.classList.remove('chargement');
+            hote.innerHTML = '<p class="graphique-note">Historique de cours indisponible.</p>';
+          });
+      }
+
+      barre.addEventListener('click', function (e) {
+        var bouton = e.target.closest('button');
+        if (!bouton) return;
+        barre.querySelectorAll('button').forEach(function (b) { b.classList.remove('on'); });
+        bouton.classList.add('on');
+        jours = parseInt(bouton.dataset.jours, 10);
+        affiche();
+      });
+
+      affiche();
+    })();
+    </script>
+  {% endif %}
+
+  {% if note %}
+    <div class="note-bloc">
+      <span class="note-geante n-{{ note.famille }}">{{ note.lettre }}</span>
+      <span class="note-corps">
+        <span class="note-titre">Marge de conformité — {{ (note.marge * 100) | round | int }} % encore disponible</span>
+        <span class="note-texte">{{ note.resume }}</span>
+        <span class="note-jauge">
+          <span class="note-part p-{{ note.famille }}" style="width:{{ (note.marge * 100) | round(1) }}%"></span>
+        </span>
+      </span>
+    </div>
+    <p class="graphique-note" style="margin:-6px 0 0">
+      Cette note mesure <strong>uniquement</strong> la distance aux seuils de
+      {{ standard.label }} : le ratio le plus contraignant consomme
+      {{ (note.tension * 100) | round | int }} % de la marge autorisée. Ce n'est
+      <strong>pas</strong> une note de qualité d'investissement — elle ne dit rien
+      de la rentabilité, de la valorisation ni des perspectives de la société.
+      Une entreprise sans dette et sans bénéfices obtiendrait A+.
+    </p>
+  {% endif %}
+
+  {% if condition %}
+    <div class="encart encart-neutre">
+      <p><strong>Ce qu'il faudrait pour que ce verdict bascule.</strong>
+      {% if condition.type == 'cours' %}
+        {{ standard.label }} divise par la capitalisation boursière, donc le
+        verdict dépend du cours.
+        {% if condition.depasse %}
+          Cette valeur deviendrait conforme sur le ratio « {{ condition.ratio | lower }} »
+          si le cours atteignait <strong>{{ condition.pivot | nombre }} {{ condition.devise }}</strong>,
+          soit {{ condition.ecart | signe }} depuis {{ condition.actuel | nombre }} {{ condition.devise }}.
+        {% else %}
+          Elle cesserait de l'être sur le ratio « {{ condition.ratio | lower }} »
+          si le cours tombait sous <strong>{{ condition.pivot | nombre }} {{ condition.devise }}</strong>,
+          soit {{ condition.ecart | signe }} depuis {{ condition.actuel | nombre }} {{ condition.devise }}.
+        {% endif %}
+      {% else %}
+        {{ standard.label }} divise par le total du bilan : aucun mouvement de
+        cours ne change ce verdict.
+        {% if condition.depasse %}
+          Il faudrait ramener « {{ condition.ratio | lower }} » à
+          <strong>{{ condition.pivot | montant }} {{ condition.devise }}</strong>
+          contre {{ condition.actuel | montant }} aujourd'hui.
+        {% else %}
+          Le poste « {{ condition.ratio | lower }} » pourrait monter jusqu'à
+          <strong>{{ condition.pivot | montant }} {{ condition.devise }}</strong>
+          contre {{ condition.actuel | montant }} aujourd'hui avant de basculer.
+        {% endif %}
+      {% endif %}
+      </p>
+      <p>C'est une condition, pas une échéance : nous ne prédisons ni les cours
+      ni les décisions d'endettement. <a href="{{ url_for('suivi') }}">Suivre cette
+      valeur</a> pour être averti si le verdict change.</p>
+    </div>
+  {% endif %}
+
+  <div class="onglets" role="tablist">
+    <button type="button" class="on" data-panneau="conformite" role="tab" aria-selected="true">Conformité</button>
+    <button type="button" data-panneau="finances" role="tab" aria-selected="false">Finances</button>
+    <button type="button" data-panneau="actualites" role="tab" aria-selected="false">Actualités</button>
+  </div>
+
+  <div class="panneau" id="p-conformite" role="tabpanel">
 
   {% if resultat.ratios %}
     <h2 class="section">Ratios financiers — {{ standard.full }}</h2>
@@ -29,7 +565,7 @@
             <div>
               <div class="ratio-nom">{{ r.label }}</div>
               <div class="ratio-detail num">
-                {% if r.montant is not none %}{{ r.montant | montant }} rapporté à la {{ standard.denominator_label }}
+                {% if r.montant is not none %}{{ r.montant | montant }} rapporté {{ standard.denominator_complement }}
                 {% else %}Ligne absente du bilan publié{% endif %}
               </div>
             </div>
@@ -52,15 +588,196 @@
       {% endfor %}
     </div>
     {% if societe.bilan_date %}
-      <p class="pied-liens" style="margin-top:10px">
+      <p class="provenance">
         Montants issus du bilan arrêté au {{ societe.bilan_date | date_fr }}.
-        Capitalisation au {{ fetched_at | date_fr }}.
+        {%- if societe.bilan_plan %}
+          Comptes lus dans les états financiers déposés par la société
+          {%- if societe.bilan_source %} (<a href="{{ societe.bilan_source }}"
+            rel="noopener">le document</a>){% endif %}, au plan
+          {{ societe.bilan_plan }}.
+        {%- else %}
+          Capitalisation au {{ fetched_at | date_fr }}.
+        {%- endif %}
       </p>
+      {% if societe.bilan_reserve %}
+        <p class="note">{{ societe.bilan_reserve }}</p>
+      {% endif %}
     {% endif %}
   {% endif %}
 
-  {# Inutile de répéter le motif sectoriel quand c'est lui qui a produit le
-     verdict affiché en tête de page. #}
+  {# --- Historique de conformité ------------------------------------- #}
+  {% if historique | length > 1 %}
+    <h2 class="section">Conformité, exercice par exercice</h2>
+    <div class="cadre defilement">
+      <table>
+        <thead>
+          <tr>
+            <th>Exercice</th>
+            <th>Verdict {{ standard.label }}</th>
+            {% for r in historique[0].ratios %}<th class="a-droite">{{ r.label }}</th>{% endfor %}
+            <th class="a-droite">{{ 'Total bilan' if standard.denominator == 'total_assets' else 'Capitalisation' }}</th>
+            <th class="a-droite">Chiffre d'affaires</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in historique %}
+            <tr>
+              <td class="num">{{ h.date | date_fr }}</td>
+              <td><span class="verdict v-{{ h.verdict }}">{{ engine.VERDICT_LABELS[h.verdict] }}</span></td>
+              {% for r in h.ratios %}
+                <td class="a-droite num {{ 'depasse' if r.statut == 'depasse' }}">{{ r.valeur | pourcent }}</td>
+              {% endfor %}
+              {% if not h.ratios %}<td colspan="{{ historique[0].ratios | length }}" class="secteur">—</td>{% endif %}
+              <td class="a-droite num">{{ (h.market_cap if standard.denominator == 'market_cap' else none) | montant if standard.denominator == 'market_cap' else '—' }}</td>
+              <td class="a-droite num">{{ h.revenu | montant }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="comp-note" style="margin-top:10px; max-width:68ch">
+      Chaque exercice est jugé sur ses propres chiffres. La capitalisation
+      passée est reconstituée à partir du cours de clôture de l'arrêté et du
+      nombre d'actions du même bilan — pas de la capitalisation d'aujourd'hui.
+      <strong>En revanche le filtre sectoriel appliqué est celui d'aujourd'hui</strong> :
+      Yahoo ne publie pas l'activité historique d'une société.
+    </p>
+  {% endif %}
+
+  </div>
+
+  <div class="panneau" id="p-finances" role="tabpanel" hidden>
+
+  {# --- Le bilan lui-même ---------------------------------------------
+     Les quatre grandeurs du screening n'apparaissaient jusqu'ici qu'en
+     numérateurs de ratios, dans l'onglet Conformité. Elles valent d'être
+     lues pour elles-mêmes : ce sont les comptes de la société, et sur les
+     valeurs d'Abidjan c'était même la seule page de cet onglet — le reste
+     vient de Yahoo, qui ne connaît pas cette place. #}
+  {% if societe.total_assets %}
+    <h2 class="section">
+      Bilan{% if societe.bilan_date %} au {{ societe.bilan_date | date_fr }}{% endif %}
+    </h2>
+    <div class="cadre defilement">
+      <table class="t-etroit">
+        <thead>
+          <tr>
+            <th>Poste</th>
+            <th class="a-droite">Montant</th>
+            <th class="a-droite">Part du bilan</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lb, val in [
+              ('Total du bilan', societe.total_assets),
+              ('Dette portant intérêt', societe.total_debt),
+              ('Trésorerie et placements', societe.cash_and_investments),
+              ('Créances clients', societe.receivables)
+          ] %}
+            <tr>
+              <td>{{ lb }}</td>
+              <td class="a-droite num">
+                {% if val is none %}—
+                {% else %}{{ val | montant }} {{ societe.currency or '' }}{% endif %}
+              </td>
+              <td class="a-droite num">
+                {% if val is none %}—
+                {% elif loop.first %}100 %
+                {% else %}{{ (val / societe.total_assets) | pourcent }}{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="provenance">
+      {%- if societe.bilan_plan %}
+        Comptes lus dans les états financiers déposés par la société
+        {%- if societe.bilan_source %} (<a href="{{ societe.bilan_source }}"
+          rel="noopener">le document</a>){% endif %}, au plan
+        {{ societe.bilan_plan }}.
+      {%- else %}
+        Montants lus dans le bilan publié, et non dans la fiche de synthèse
+        de la source : les quatre lignes viennent du même arrêté comptable.
+      {%- endif %}
+      Un bilan ne dit pas tout d'une société — il ne dit rien de sa
+      rentabilité, de son carnet de commandes ni de la qualité de sa
+      gestion. Il dit ce que les standards de screening demandent.
+    </p>
+    {% if societe.bilan_reserve %}
+      <p class="note">{{ societe.bilan_reserve }}</p>
+    {% endif %}
+  {% endif %}
+
+  {# --- Valorisation -------------------------------------------------- #}
+  {% set v = societe.valorisation or {} %}
+  {% if v.per or v.price_to_book or v.ev_ebitda %}
+    <h2 class="section">Valorisation</h2>
+    <div class="chiffres">
+      {% for lb, val, suffixe in [
+          ('PER', v.per, ''), ('PER estimé', v.per_estime, ''),
+          ('Cours / actif net', v.price_to_book, ''), ('VE / EBITDA', v.ev_ebitda, ''),
+          ('Bêta', v.beta, ''), ('Marge nette', v.marge_nette, '%'),
+          ('Rentabilité des fonds propres', v.roe, '%'),
+          ('Rendement du dividende', societe.rendement, '%')
+      ] %}
+        <div class="chiffre">
+          <div class="chiffre-lb">{{ lb }}</div>
+          <div class="chiffre-val num">
+            {% if val is none %}—
+            {% elif suffixe == '%' %}{{ (val if val > 1 else val * 100) | nombre(1) }} %
+            {% else %}{{ val | nombre(1) }}{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+      {% if v.plus_bas_52s and v.plus_haut_52s %}
+        <div class="chiffre">
+          <div class="chiffre-lb">Extrêmes sur 52 semaines</div>
+          <div class="chiffre-val num">{{ v.plus_bas_52s | nombre }} – {{ v.plus_haut_52s | nombre }}</div>
+        </div>
+      {% endif %}
+    </div>
+    <p class="comp-note" style="margin-top:10px">
+      Ces multiples ne participent pas au screening : la conformité ne dit rien
+      du prix payé. Une valeur peut être parfaitement conforme et chèrement
+      valorisée.
+    </p>
+  {% endif %}
+
+  {# --- Comptes annuels ---------------------------------------------- #}
+  {% set avec_comptes = historique | selectattr('revenu') | list %}
+  {% if avec_comptes | length > 1 %}
+    <h2 class="section">Comptes annuels</h2>
+    <div class="cadre defilement">
+      <table>
+        <thead>
+          <tr>
+            <th>Exercice</th>
+            <th class="a-droite">Chiffre d'affaires</th>
+            <th class="a-droite">Résultat net</th>
+            <th class="a-droite">Marge nette</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in avec_comptes %}
+            <tr>
+              <td class="num">{{ h.date | date_fr }}</td>
+              <td class="a-droite num">{{ h.revenu | montant }}</td>
+              <td class="a-droite num">{{ h.resultat_net | montant }}</td>
+              <td class="a-droite num">
+                {{ (h.resultat_net / h.revenu) | pourcent if h.resultat_net and h.revenu else '—' }}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  </div>
+
+  <div class="panneau" id="p-conformite" role="tabpanel">
+
   {% if resultat.sector_reason and resultat.sector_reason != resultat.raison %}
     <h2 class="section">Filtre sectoriel</h2>
     <div class="motif m-{{ 'non_conforme' if resultat.sector_verdict == 'exclu' else 'a_verifier' }}">
@@ -82,7 +799,7 @@
     <div class="calc">
       <div class="calc-champs">
         <div class="champ">
-          <label for="div">Dividendes perçus (€)</label>
+          <label for="div">Dividendes perçus ({{ societe.currency or '€' }})</label>
           <input type="number" id="div" min="0" step="0.01" value="{{ '%.2f' | format(societe.dividende_par_action) if societe.dividende_par_action else '' }}" placeholder="0,00">
         </div>
         <div class="champ">
@@ -91,7 +808,7 @@
         </div>
         <div class="calc-sortie">
           <div class="cs-lb">Montant à purifier</div>
-          <div class="cs-val" id="sortie">—</div>
+          <div class="cs-val num" id="sortie">—</div>
         </div>
       </div>
       <p class="comp-note">
@@ -99,6 +816,20 @@
         {% if societe.dividende_par_action %}Le champ dividende est prérempli avec le dividende annuel par action ({{ '%.2f' | format(societe.dividende_par_action) }} {{ societe.currency or '' }}) : remplacez-le par le total que vous avez réellement perçu.{% endif %}
       </p>
     </div>
+
+    {% if societe.dividendes | length > 1 %}
+      <h3 class="sous-section">Dividendes versés</h3>
+      <div class="cadre defilement">
+        <table>
+          <thead><tr><th>Date de détachement</th><th class="a-droite">Montant par action</th></tr></thead>
+          <tbody>
+            {% for d, m in societe.dividendes | reverse %}
+              <tr><td class="num">{{ d | date_fr }}</td><td class="a-droite num">{{ m | nombre }} {{ societe.currency or '' }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
   {% endif %}
 
   <h2 class="section">Le même titre selon les trois standards</h2>
@@ -122,6 +853,36 @@
     <p class="chapeau" style="max-width:68ch">{{ societe.resume[:700] }}{% if societe.resume | length > 700 %}…{% endif %}</p>
   {% endif %}
 
+  </div>
+
+  <div class="panneau" id="p-actualites" role="tabpanel" hidden>
+    <h2 class="section">Dépêches sur cette valeur</h2>
+    <div id="fil-valeur">
+      {% if depeches %}
+        <div class="fil">
+          {% for a in depeches %}
+            <a class="actu" href="{{ a.lien }}" target="_blank" rel="noopener noreferrer">
+              <div class="actu-tete">
+                {% if a.source %}<span class="actu-source">{{ a.source }}</span>{% endif %}
+                {% if a.publie %}<span>{{ a.publie | date_fr }}</span>{% endif %}
+              </div>
+              <div class="actu-titre">{{ a.titre }}</div>
+              {% if a.resume %}<p class="actu-resume">{{ a.resume }}</p>{% endif %}
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="vide">Aucune dépêche collectée pour cette valeur.</p>
+      {% endif %}
+    </div>
+    <div class="encart encart-neutre">
+      <p><strong>Ces dépêches viennent de Yahoo Finance, en anglais.</strong>
+      C'est la seule source qui sache rattacher un article à une société précise ;
+      pour de l'actualité en français, voyez la rubrique
+      <a href="{{ url_for('actualites') }}">Actualités</a>.</p>
+    </div>
+  </div>
+
 </main>
 
 <script>
@@ -135,10 +896,39 @@
     function calcule() {
       var d = parseFloat(div.value), p = parseFloat(part.value);
       if (isNaN(d) || isNaN(p)) { sortie.textContent = '—'; return; }
-      sortie.textContent = (d * p / 100).toFixed(2).replace('.', ',') + ' €';
+      sortie.textContent = (d * p / 100).toFixed(2).replace('.', ',') + ' {{ societe.currency or "€" }}';
     }
     div.addEventListener('input', calcule);
     part.addEventListener('input', calcule);
   })();
+</script>
+
+<script>
+// Onglets. Deux panneaux portent l'identifiant « p-conformite » — les
+// ratios d'un côté, le filtre sectoriel et la comparaison de l'autre —
+// parce que les Finances s'intercalent entre les deux dans le flux du
+// document. On bascule donc sur tous les panneaux d'un même nom.
+(function () {
+  var barre = document.querySelector('.onglets');
+  if (!barre) return;
+  var panneaux = document.querySelectorAll('.panneau');
+
+  barre.addEventListener('click', function (e) {
+    var bouton = e.target.closest('button[data-panneau]');
+    if (!bouton) return;
+    var cible = bouton.dataset.panneau;
+
+    barre.querySelectorAll('button').forEach(function (b) {
+      var actif = b === bouton;
+      b.classList.toggle('on', actif);
+      b.setAttribute('aria-selected', String(actif));
+    });
+    panneaux.forEach(function (p) {
+      p.hidden = p.id !== 'p-' + cible;
+    });
+    // Le graphique vit hors des panneaux : il reste visible en permanence,
+    // ce qui est voulu — c'est le repère commun aux trois onglets.
+  });
+})();
 </script>
 {% endblock %}

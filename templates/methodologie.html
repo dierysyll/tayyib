@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "icones.html" import icone, pays %}
 {% block titre %}Méthodologie{% endblock %}
 
 {% block contenu %}
@@ -8,6 +9,61 @@
   <p class="chapeau">
     Comment chaque verdict est produit, d'où viennent les chiffres, et ce que
     cet outil ne sait pas faire.
+  </p>
+
+  <h2 id="couverture">Les places couvertes</h2>
+  <p>
+    {{ total }} valeurs sont actuellement dans le cache, réparties sur les places
+    ci-dessous. Une place n'est retenue que si Yahoo Finance en publie les
+    <strong>bilans datés</strong> : sans bilan, aucun ratio n'est calculable, et un
+    screener qui affiche une valeur sans pouvoir la juger ne rend pas service.
+  </p>
+
+  {#- Les régions sont repliées et de même rang : l'Europe compte le plus de
+      places, mais elle n'a pas à occuper toute la page devant les autres.
+      Chaque nom de place ouvre sa fiche. -#}
+  {% for region in regions %}
+    <details class="repli" {% if loop.first %}open{% endif %}>
+      <summary>
+        {{ region.nom }}
+        <span class="repli-compte">{{ region.places | length }} places</span>
+      </summary>
+      <div class="repli-corps" style="padding:4px 20px 16px">
+        <p>{{ region.resume }}</p>
+        <ul>
+          {% for p in region.places %}
+            <li>
+              <a href="/place/{{ p.id }}">{{ pays(p.code, p.region) }} <strong>{{ p.nom }}</strong></a> —
+              {{ p.pays }}, {{ p.indice }}, coté en {{ p.devise }}{% if p.id not in collectees %}
+              <em>(pas encore collectée)</em>{% endif %}.
+              {% if p.note %}{{ p.note }}{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </details>
+  {% endfor %}
+
+  <h3>Ce que nous ne couvrons pas, et pourquoi</h3>
+  <p>
+    Ces absences sont d'autant plus regrettables qu'elles frappent précisément le
+    public de cet outil. Les annoncer vaut mieux que de vous laisser les découvrir
+    en cherchant une valeur qui n'y est pas.
+  </p>
+  <ul>
+    {% for a in absentes %}
+      <li><strong>{{ a.nom }}</strong> ({{ a.pays }}) — {{ a.raison }}</li>
+    {% endfor %}
+  </ul>
+
+  <h3>Les devises</h3>
+  <p>
+    Les capitalisations sont converties en euros pour pouvoir être comparées et
+    triées d'une place à l'autre ; le montant en devise de cotation figure sur
+    chaque fiche. Les <strong>ratios de screening ne sont jamais convertis</strong>, et
+    n'ont pas à l'être : dette et capitalisation d'une même société sont dans la
+    même devise, le rapport est donc invariant. Un taux de change erroné fausserait
+    l'ordre d'affichage, jamais un verdict.
   </p>
 
   <h2>Deux filtres, dans cet ordre</h2>

@@ -1,56 +1,173 @@
 {% extends "base.html" %}
+{% from "icones.html" import icone, pays %}
 {% block titre %}Screener{% endblock %}
 
-{% macro lien(verdict) -%}
-?standard={{ standard.id }}{% if q %}&q={{ q }}{% endif %}{% if verdict %}&verdict={{ verdict }}{% endif %}
+{#- Un seul endroit où l'on construit les liens : chaque filtre doit
+    préserver tous les autres, sinon changer de standard perd la recherche.
+    '=' signifie « garder la valeur courante », `none` signifie « effacer ». -#}
+{% macro lien(std='=', verd='=', reg='=', plc='=') -%}
+  {%- set params = {
+       'standard': standard.id if std == '=' else std,
+       'q': q,
+       'secteur': secteur,
+       'verdict': filtre if verd == '=' else verd,
+       'region': region if reg == '=' else reg,
+       'place': place if plc == '=' else plc,
+       'tri': none if tri == 'pertinence' else tri,
+     } -%}
+  ?{% for cle, val in params.items() if val %}{{ cle }}={{ val | urlencode }}{% if not loop.last %}&amp;{% endif %}{% endfor %}
 {%- endmacro %}
 
 {% block contenu %}
 <main class="page">
 
-  <h1 class="titre-page">Le screener halal de la place de Paris</h1>
-  <p class="chapeau">
-    {{ total }} valeurs d'Euronext Paris passées au filtre {{ standard.full }}.
-    Chaque verdict affiche son calcul, sa source et sa date d'arrêté comptable.
-  </p>
+  <section class="heros">
+    <h1 class="titre-page">Le screener boursier <em>halal</em><br>du monde entier</h1>
+    <p class="chapeau">
+      {{ total_univers }} valeurs cotées sur {{ toutes_places | length }} places, passées au
+      filtre {{ standard.full }}. Chaque verdict affiche son calcul, sa source et sa
+      date d'arrêté comptable — parce qu'un screening invérifiable ne vaut rien.
+    </p>
+    <div class="heros-meta">
+      {%- set places_musulmanes = toutes_places.values() | selectattr('region', 'equalto', 'monde-musulman') | list | length -%}
+      <span class="jeton">{{ pays("FR", "europe") }} <strong>Paris</strong> — la place de référence</span>
+      <span class="jeton">{{ icone("croissant", 15) }} <strong>{{ places_musulmanes }} places</strong> du monde musulman</span>
+      <span class="jeton">{{ icone("valeurs", 15) }} <strong>{{ standards | length }} standards</strong> comparés côte à côte</span>
+    </div>
+  </section>
+
+  {% if bandeau %}
+    <div class="bandeau" aria-label="Cotations de l'univers">
+      {#- La piste est écrite deux fois : l'animation translate de -50 %,
+          donc la seconde copie prend exactement la place de la première et
+          la boucle se referme sans saut. -#}
+      <div class="bandeau-piste">
+        {% for passe in [1, 2] %}
+          {% for e in bandeau %}
+            {% set s = e.societe %}
+            <a class="bandeau-item" href="/valeur/{{ s.ticker }}?standard={{ standard.id }}"
+               {% if passe == 2 %}aria-hidden="true" tabindex="-1"{% endif %}>
+              <span class="bandeau-pastille bp-{{ e.resultat.verdict }}"></span>
+              <span class="bandeau-sym">{{ s.ticker }}</span>
+              <span class="bandeau-var {{ 'hausse' if s.variation >= 0 else 'baisse' }}">{{ s.variation | signe }}</span>
+            </a>
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
 
   <div class="compteurs">
-    <a class="compteur c-tous {% if not filtre %}on{% endif %}" href="{{ lien(none) }}">
-      <div class="compteur-nb num">{{ total }}</div>
-      <div class="compteur-lb">Valeurs suivies</div>
+    <a class="compteur c-tous {% if not filtre %}on{% endif %}" href="{{ lien(verd=none) }}">
+      <div class="compteur-nb">{{ total }}</div>
+      <div class="compteur-lb">{% if region or place %}Dans ce périmètre{% else %}Valeurs suivies{% endif %}</div>
     </a>
     {% for v, libelle in [('conforme', 'Conformes'), ('a_verifier', 'À vérifier'), ('non_conforme', 'Non conformes')] %}
-      <a class="compteur c-{{ v }} {% if filtre == v %}on{% endif %}" href="{{ lien(v) }}">
-        <div class="compteur-nb num">{{ compteurs[v] }}</div>
+      <a class="compteur c-{{ v }} {% if filtre == v %}on{% endif %}" href="{{ lien(verd=v) }}">
+        <div class="compteur-nb">{{ compteurs[v] }}</div>
         <div class="compteur-lb">{{ libelle }}</div>
+        {% if total %}<div class="compteur-part">{{ (compteurs[v] / total * 100) | round | int }} % de l'univers</div>{% endif %}
       </a>
     {% endfor %}
   </div>
 
-  <div class="outils">
-    <form class="recherche" method="get" action="/">
-      <input type="search" name="q" value="{{ q }}" placeholder="Chercher une valeur — Air Liquide, TTE.PA…" autocomplete="off">
-      <input type="hidden" name="standard" value="{{ standard.id }}">
-      {% if filtre %}<input type="hidden" name="verdict" value="{{ filtre }}">{% endif %}
-    </form>
-    <div class="segments">
-      {% for sid, std in standards.items() %}
-        <a href="?standard={{ sid }}{% if q %}&q={{ q }}{% endif %}{% if filtre %}&verdict={{ filtre }}{% endif %}"
-           class="{% if sid == standard.id %}on{% endif %}">{{ std.label }}</a>
+  <div class="rubans">
+    <div class="ruban">
+      <span class="ruban-titre">Région</span>
+      <a class="pastille {% if not region and not place %}on{% endif %}" href="{{ lien(reg=none, plc=none) }}">Toutes</a>
+      {% for r in regions %}
+        <a class="pastille r-{{ r.id }} {% if region == r.id and not place %}on{% endif %}"
+           href="{{ lien(reg=r.id, plc=none) }}">
+          {{ r.nom }} <span class="compte">{{ r.compte }}</span>
+        </a>
       {% endfor %}
     </div>
+
+    {% if places %}
+      <div class="ruban">
+        <span class="ruban-titre">Place</span>
+        {% for p in places %}
+          <a class="pastille {% if place == p.id %}on{% endif %}" href="{{ lien(plc=p.id) }}">
+            {{ pays(p.code, p.region) }} {{ p.nom }} <span class="compte">{{ p.compte }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
   </div>
+
+  {% if place %}
+    <div class="encart encart-info">
+      <p>
+        {{ pays(toutes_places[place].code, toutes_places[place].region) }} <strong>{{ toutes_places[place].nom }}</strong> —
+        {{ toutes_places[place].pays }}, {{ toutes_places[place].indice }},
+        coté en {{ toutes_places[place].devise }}.
+        {% if toutes_places[place].note %}{{ toutes_places[place].note }}{% endif %}
+        <a href="/place/{{ place }}?standard={{ standard.id }}">Voir la fiche complète de la place →</a>
+      </p>
+    </div>
+  {% endif %}
+
+  {#- Pas de champ caché `standard` ici : la liste déroulante plus bas porte
+      déjà ce nom, et deux champs homonymes enverraient deux valeurs. -#}
+  <form class="outils" method="get" action="/">
+    {% if filtre %}<input type="hidden" name="verdict" value="{{ filtre }}">{% endif %}
+    {% if region %}<input type="hidden" name="region" value="{{ region }}">{% endif %}
+    {% if place %}<input type="hidden" name="place" value="{{ place }}">{% endif %}
+
+    <div class="recherche">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5" stroke-linecap="round"/>
+      </svg>
+      <input type="search" name="q" value="{{ q }}" placeholder="Chercher une valeur — Aramco, Air Liquide, MC.PA…" autocomplete="off">
+    </div>
+
+    <select name="secteur" class="selecteur" onchange="this.form.submit()">
+      <option value="">Tous les secteurs</option>
+      {% for s in secteurs %}
+        <option value="{{ s }}" {% if s == secteur %}selected{% endif %}>{{ secteur_fr(s) }}</option>
+      {% endfor %}
+    </select>
+
+    <select name="tri" class="selecteur" onchange="this.form.submit()">
+      {% for cle, libelle in tris.items() %}
+        <option value="{{ cle }}" {% if cle == tri %}selected{% endif %}>Trier : {{ libelle }}</option>
+      {% endfor %}
+    </select>
+
+    {#- Six standards ne tiennent pas en pastilles : au-delà de trois ou
+        quatre, une liste déroulante se lit mieux qu'une rangée qui déborde. -#}
+    <select name="standard" class="selecteur" onchange="this.form.submit()">
+      {% for sid, std in standards.items() %}
+        <option value="{{ sid }}" {% if sid == standard.id %}selected{% endif %}>Standard : {{ std.label }}</option>
+      {% endfor %}
+    </select>
+
+    <noscript><button class="bouton" type="submit">Filtrer</button></noscript>
+  </form>
+
+  {% if total_filtre != total %}
+    <p class="compte-filtre" style="margin:-4px 0 14px">
+      {{ total_filtre }} valeur{{ 's' if total_filtre > 1 }} trouvée{{ 's' if total_filtre > 1 }}
+      sur {{ total }} dans ce périmètre.
+    </p>
+  {% endif %}
 
   <div class="cadre">
     {% if evaluees %}
     <div class="defilement">
-      <table>
+      {# `t-screener` commande le repli des colonnes secondaires sur petit
+         écran (voir style.css). Il est propre à ce tableau-ci, dont on
+         connaît les huit colonnes et leur ordre. #}
+      <table class="t-screener">
         <thead>
           <tr>
             <th>Valeur</th>
+            <th>Place</th>
             <th>Secteur</th>
             <th>Verdict {{ standard.label }}</th>
+            <th>Marge</th>
             <th class="a-droite">Dette / {{ 'bilan' if standard.denominator == 'total_assets' else 'capi.' }}</th>
+            <th class="a-droite">Rendement</th>
             <th class="a-droite">Capitalisation</th>
           </tr>
         </thead>
@@ -58,15 +175,30 @@
           {% for e in evaluees %}
             {% set s = e.societe %}{% set r = e.resultat %}
             {% set dette = r.ratios | selectattr('cle', 'equalto', 'debt') | first %}
+            {% set p = toutes_places.get(s.place) %}
             <tr>
               <td>
                 <a class="nom-valeur" href="/valeur/{{ s.ticker }}?standard={{ standard.id }}">{{ s.nom }}</a>
-                <div class="ticker num">{{ s.ticker }}</div>
+                <div class="ticker">{{ s.ticker }}</div>
               </td>
-              <td class="secteur">{{ s.industry or s.sector or '—' }}</td>
+              <td>
+                {% if p %}
+                  <span class="place-tag">
+                    <span class="place-pip p-{{ p.region }}"></span>
+                    {{ pays(p.code, p.region) }} {{ p.nom }}
+                  </span>
+                {% else %}<span class="secteur">—</span>{% endif %}
+              </td>
+              <td class="secteur">{{ activite(s) or '—' }}</td>
               <td><span class="verdict v-{{ r.verdict }}">{{ engine.VERDICT_LABELS[r.verdict] }}</span></td>
-              <td class="a-droite num">{{ (dette.valeur if dette else none) | pourcent }}</td>
-              <td class="a-droite num">{{ s.market_cap | montant }}</td>
+              <td>
+                {% if e.note %}
+                  <span class="note n-{{ e.note.famille }}" title="{{ e.note.resume }}">{{ e.note.lettre }}</span>
+                {% else %}<span class="note-absente">—</span>{% endif %}
+              </td>
+              <td class="a-droite">{{ (dette.valeur if dette else none) | pourcent }}</td>
+              <td class="a-droite">{{ s | rendement }}</td>
+              <td class="a-droite">{{ s.market_cap_eur | euros }}</td>
             </tr>
           {% endfor %}
         </tbody>
@@ -74,11 +206,51 @@
     </div>
     {% else %}
       <p class="vide">
-        {% if q %}Aucune valeur ne correspond à « {{ q }} ».{% else %}
+        {% if q or secteur or region or place %}Aucune valeur ne correspond à ces critères.{% else %}
         Le cache est vide. Lancez <code>python refresh.py</code> pour collecter les données.{% endif %}
       </p>
     {% endif %}
   </div>
+
+  {% if tronque %}
+    <p class="compte-filtre" style="margin-top:12px">
+      {{ par_page }} premières valeurs affichées sur {{ total_filtre }}.
+      Affinez par région, par secteur ou par recherche pour voir le reste.
+    </p>
+  {% endif %}
+
+  {% if hausses or baisses %}
+    <h2 class="section">Mouvements de la séance</h2>
+    <div class="grille-analyses">
+      {% for titre, liste, icone_nom, teinte in [
+           ('Plus fortes hausses', hausses, 'hausse', 'i-vert'),
+           ('Plus fortes baisses', baisses, 'baisse', 'i-rouge')] %}
+        <section class="carte">
+          <div class="carte-tete">
+            <div>
+              <h3 class="carte-titre">{{ titre }}</h3>
+              <p class="carte-sous">Variation de la dernière séance de cotation.</p>
+            </div>
+            <span class="carte-icone {{ teinte }}">{{ icone(icone_nom) }}</span>
+          </div>
+          <div class="carte-corps">
+            <div class="liste-valeurs">
+              {% for e in liste %}
+                {% set s = e.societe %}
+                <a class="lv-ligne" href="/valeur/{{ s.ticker }}?standard={{ standard.id }}">
+                  <span class="lv-corps">
+                    <span class="lv-nom">{{ s.nom }}</span>
+                    <span class="lv-meta">{{ s.ticker }} · {{ engine.VERDICT_LABELS[e.resultat.verdict] }}</span>
+                  </span>
+                  <span class="lv-val {{ 'hausse' if s.variation >= 0 else 'baisse' }}">{{ s.variation | signe }}</span>
+                </a>
+              {% endfor %}
+            </div>
+          </div>
+        </section>
+      {% endfor %}
+    </div>
+  {% endif %}
 
   <div class="encart">
     <p><strong>Ce que ce tableau ne dit pas.</strong>
@@ -87,6 +259,8 @@
     données de marché : il se lit dans le rapport annuel. Un verdict « conforme » ici
     signifie donc <em>conforme sur les critères calculables</em>, et ce dernier filtre
     reste à votre charge.</p>
+    <p>Les capitalisations sont converties en euros pour être comparables d'une place
+    à l'autre ; le montant en devise locale figure sur chaque fiche.</p>
   </div>
 
   {% if fetched_at %}

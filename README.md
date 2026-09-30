@@ -1,12 +1,21 @@
 # Tayyib
 
-Screener boursier halal pour la place de Paris. Le nom vient de
-*halalan tayyiban* : licite, et pur.
+Screener boursier halal, en français, sur les places du monde entier. Le nom
+vient de *halalan tayyiban* : licite, et pur.
 
-Les deux références du screening halal — Zoya et Musaffa — sont anglophones
-et centrées sur les valeurs américaines. Un investisseur francophone qui
-détient un PEA n'y trouve pas ses valeurs. Tayyib commence là où le manque
-est réel : les 60 grandes valeurs d'Euronext Paris.
+Les deux références du screening halal — Zoya et Musaffa — sont anglophones et
+centrées sur les valeurs américaines. Un investisseur francophone qui détient
+un PEA n'y trouve pas ses valeurs, et un musulman qui veut regarder Riyad,
+Istanbul ou Kuala Lumpur n'y trouve pas davantage son compte. Tayyib est né du
+premier manque — Euronext Paris — et couvre aujourd'hui **29 places** sur
+quatre continents. Paris reste la place de référence.
+
+Parmi elles, la **BRVM d'Abidjan**, place commune aux huit pays de l'UEMOA :
+absente de Yahoo Finance, elle est collectée directement à sa source — les
+cours et la capitalisation sur les pages de la Bourse, les comptes dans les
+états financiers que chaque société y dépose. C'est la seule place où un épargnant sénégalais ou
+ivoirien achète dans sa propre monnaie, et aucun autre screener halal ne la
+couvre.
 
 ## Ce que fait l'application
 
@@ -24,6 +33,24 @@ Pour chaque société, deux filtres appliqués dans cet ordre :
 Le résultat est un verdict à trois états : conforme, non conforme,
 à vérifier.
 
+Autour du screener, quatre rubriques :
+
+- **Analyses** — les basculements de conformité au dernier arrêté comptable
+  (une valeur qui se désendette redevient conforme, et personne ne le publie),
+  les palmarès des conformes, le taux de conformité par place, et les valeurs
+  sur lesquelles les trois standards se contredisent.
+- **Purification** — le montant à purifier sur les dividendes perçus.
+- **Zakat** — l'assiette selon l'intention de détention, le nissab calculé sur
+  le cours du jour de l'or et de l'argent, le taux de 2,5 %.
+- **Actualités** — un fil agrégé, avec le verdict attaché à chaque société
+  citée. C'est la rubrique la plus faible des quatre, et la page le dit.
+
+À part, un **compartiment sukuk**. La BRVM cote 269 lignes obligataires, dont
+cinq sont des sukuk et 264 des emprunts à intérêt. Les trier ne demande aucune
+compétence religieuse et personne ne le fait en Afrique de l'Ouest ; c'est donc
+fait ici. Ces titres ne passent pas par le screener — un sukuk n'a ni activité
+ni bilan, et lui appliquer un ratio de dette n'aurait pas de sens.
+
 ## Le parti pris : ne jamais transformer une incertitude en verdict
 
 C'est ce qui distingue Tayyib de ses concurrents, et c'est un choix de
@@ -39,74 +66,192 @@ mention correspondante.
 **Le troisième verdict.** « Aerospace & Defense » range sous une même
 étiquette l'aviation civile et l'armement ; la grande distribution vend de
 l'alcool sans que ce soit son métier. Un « à vérifier » honnête vaut mieux
-qu'un « conforme » faux.
+qu'un « conforme » faux. Au Caire et à Karachi, Yahoo ne renseigne pas le
+secteur d'activité : ces valeurs tombent donc en « à vérifier », et la place
+le signale.
 
 **Une source datée plutôt qu'une source pratique.** Yahoo expose les mêmes
 grandeurs à deux endroits, et les deux ne concordent pas : sa fiche de
 synthèse annonce 4,05 Md€ de trésorerie pour L'Oréal, quand le bilan au
 31/12/2025 en porte 9,90 Md€. Nous lisons le bilan publié, et lui seul, pour
 tout ce qui entre dans les ratios — les trois montants viennent du même
-arrêté comptable, et cet arrêté est affiché. Un ratio dont on ne peut pas
-nommer la date n'est pas vérifiable.
+arrêté comptable, et cet arrêté est affiché.
+
+**Une colonne choisie, pas devinée.** Les bilans de la BRVM arrivent en PDF,
+et l'actif SYSCOHADA s'y présente en trois colonnes : brut, amortissements,
+net. Chez Erium, 25,4 Md, 10,8 Md et 14,6 Md sur la même ligne — se tromper
+de colonne surestimerait l'actif de 74 %, donc sous-estimerait tous les
+ratios, donc déclarerait conformes des sociétés qui ne le sont pas.
+`data/bilans.py` ne devine pas : il retient la colonne qui **égale le total
+du passif**, et refuse le document quand aucune n'y parvient. La même
+vérification attrape une page mal appariée, une unité mal lue ou un nombre
+mal découpé.
+
+**Bloqué n'est pas absent.** Yahoo limite le débit. Un symbole qu'on n'a pas
+pu lire et un symbole qui n'existe pas produisent le même silence, mais
+appellent des réponses opposées : le second se corrige, le premier se
+redemande. `data/yahoo.py` lève `SourceIndisponible` dans le second cas, et
+`refresh.py` réessaie après une longue pause. Sans cette distinction, une
+collecte trop rapide fait disparaître des places entières du produit.
 
 ## Les standards ne donnent pas le même résultat
 
-Sur les 60 valeurs suivies :
-
-| Standard | Conformes | À vérifier | Non conformes |
-|---|---:|---:|---:|
-| AAOIFI | 16 | 4 | 40 |
-| Dow Jones | 17 | 4 | 39 |
-| MSCI Islamic | 27 | 7 | 26 |
-
 L'écart n'est pas une erreur. AAOIFI rapporte la dette à la **capitalisation
-boursière**, MSCI au **total du bilan**. TotalEnergies est ainsi non conforme
-selon AAOIFI (35,9 % de la capitalisation) et conforme selon MSCI (20,6 % du
-bilan). C'est la même entreprise, le même jour.
+boursière**, MSCI au **total du bilan**. Une valeur très bien valorisée —
+Broadcom, Eli Lilly — passe donc largement chez AAOIFI et échoue chez MSCI,
+puisque sa capitalisation est plusieurs fois son bilan. C'est la même
+entreprise, le même jour.
 
-Chaque fiche affiche les trois verdicts côte à côte, précisément pour que ce
-point soit visible.
+Chaque fiche affiche les trois verdicts côte à côte, et la page Analyses
+recense les désaccords tranchés, précisément pour que ce point soit visible.
+
+## Les devises
+
+Les capitalisations et les valorisations de portefeuille sont converties en
+euros (`data/fx.py`), sans quoi trier l'univers par taille placerait Jakarta
+au-dessus d'Apple — une capitalisation en roupies indonésiennes se compte en
+centaines de milliers de milliards. Le montant en devise de cotation reste
+affiché sur chaque fiche.
+
+Les **ratios de screening ne sont jamais convertis** : dette et capitalisation
+d'une même société sont dans la même devise, le rapport est invariant. Un taux
+de change erroné fausse l'ordre d'affichage, jamais un verdict.
+
+Attention à Londres, cotée en **pence** et non en livres : l'oubli est
+silencieux et fausse la taille des valeurs britanniques d'un facteur cent.
 
 ## Architecture
 
 ```
 app.py                  routes Flask, filtres de rendu
 refresh.py              collecte l'univers dans le cache
+charts.py               projection SVG de la courbe de cours
 screening/
-  standards.py          seuils et dénominateurs des trois standards
+  standards.py          seuils et dénominateurs des six standards
   sectors.py            filtre sectoriel (exclu / à vérifier / ok)
   engine.py             applique un standard à une société → verdict
+  analyses.py           lectures à l'échelle de l'univers entier
+  vocabulaire.py        secteurs et industries traduits (FR/EN)
+  alias.py              noms usuels et recherche sans accents
+launchd/                la collecte quotidienne de la BRVM
 data/
-  universe.py           les 60 tickers suivis
-  yahoo.py              collecte (bilan daté + capitalisation du jour)
-  cache.py              cache disque JSON, écriture atomique
+  universe.py           les places de marché et leurs valeurs
+  cours_brvm.json       la série de cours d'Abidjan, jour après jour
+  sukuk.py              les sukuk du compartiment obligataire d'Abidjan
+  yahoo.py              collecte (bilan daté + capitalisation + actualités)
+  brvm.py               collecte directe de la cote d'Abidjan
+  bilans.py             lecture des bilans SYSCOHADA et IFRS en PDF
+  presse.py             flux RSS francophones, en trois rubriques
+  fx.py                 taux de change, cours de l'or et de l'argent
+  cache.py              cache disque en deux étages
 ```
 
-Ajouter une valeur : un ticker dans `data/universe.py`, puis `refresh.py`.
-Ajouter un standard : une entrée dans `STANDARDS`. Rien d'autre à toucher.
+**La recherche.** Yahoo connaît « Saudi Arabian Oil Company » ; personne ne
+cherche autre chose qu'« Aramco ». `screening/alias.py` porte les noms usuels
+— marque commerciale, ancien nom, sigle en usage, translittération — et
+dépouille les clés de leurs accents, des deux côtés : « hermes » trouve
+Hermès, « socgen » trouve la Société Générale. Rien qui devine : « pétrole »
+ne renvoie pas à TotalEnergies, parce qu'un moteur qui extrapole finit par se
+tromper.
 
-## Lancer en local
+Le cache est scindé : `cache/index.json` porte l'essentiel de chaque valeur et
+sert toutes les pages de liste ; `cache/valeurs/<symbole>.json` porte le détail
+— six ans de cours hebdomadaires, comptes annuels, dividendes — et n'est lu
+qu'à l'ouverture d'une fiche. Avec plus de mille valeurs, un fichier unique
+pèserait une vingtaine de mégaoctets qu'il faudrait charger pour afficher un
+tableau qui n'en utilise rien.
+
+Ajouter une valeur : un symbole dans la place correspondante de
+`data/universe.py`, puis `refresh.py`. Ajouter un standard : une entrée dans
+`STANDARDS`. Ajouter une place : une entrée dans `PLACES`, avec sa devise.
+
+## Lancer
+
+Deux façons, qui servent le même code.
+
+**Sur Render**, déployé depuis la branche `main` (voir `render.yaml`). Le build
+collecte l'univers puis relit les états financiers d'Abidjan ; le disque de
+Render étant effacé à chaque déploiement, tout le cache y est reconstruit. Le
+portefeuille, la zakat et la purification ne quittent pas pour autant le
+navigateur du lecteur : ils vivent dans son stockage local, le serveur n'en
+voit rien.
+
+**En local**, pour travailler dessus :
 
 ```bash
 python -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python refresh.py     # ~2 min, construit le cache
+.venv/bin/python refresh.py     # collecte complète, ~15 min
 .venv/bin/python app.py         # http://localhost:5001
 ```
 
-`refresh.py` conserve la version en cache d'un ticker qui échoue, plutôt que
-de perdre une société sur un HTTP 429 passager.
+`refresh.py` reprend où il s'est arrêté : un symbole déjà collecté depuis moins
+de vingt heures n'est pas redemandé, et l'index est réécrit tous les quarante
+titres, de sorte que le site sert un univers qui grandit pendant la collecte.
+
+```bash
+.venv/bin/python refresh.py --brvm                 # seulement la cote d'Abidjan
+.venv/bin/python refresh.py --brvm-bilans          # + relire les états financiers
+.venv/bin/python refresh.py --places paris,riyad   # une ou plusieurs places
+.venv/bin/python refresh.py --force                # tout redemander
+.venv/bin/python refresh.py --actus                # seulement le fil d'actualité
+.venv/bin/python refresh.py --index                # réécrire l'index depuis le disque
+```
+
+### La seule chose qui doit tourner tous les jours
+
+Tout le cache se reconstruit en relançant une collecte — sauf la **série de
+cours de la BRVM**. La Bourse d'Abidjan ne publie aucun historique et ne garde
+qu'une dizaine de bulletins en ligne : un jour non collecté est un point perdu
+définitivement, et la courbe d'une valeur d'Abidjan se construit à partir de
+maintenant, pas rétroactivement.
+
+C'est la seule raison pour laquelle ce projet, par ailleurs entièrement manuel,
+a besoin d'une tâche planifiée :
+
+```bash
+./launchd/installer.sh            # 16 h 30, tous les jours
+./launchd/installer.sh --etat     # vérifier qu'elle tourne
+./launchd/installer.sh --retirer  # désinstaller
+```
+
+Pour la même raison, cette série ne vit pas dans `cache/`, qui est ignoré par
+git : elle est écrite dans `data/cours_brvm.json`, versionnée avec le code.
+C'est aussi ce qui la fait arriver sur Render, dont le disque ne garde rien
+d'un déploiement à l'autre : la série publiée est celle du dernier `git push`.
+La tâche locale l'allonge chaque jour ; il faut la pousser pour que le site
+en ligne en profite.
 
 ## Limites connues
 
 - Le **filtre des 5 %** n'est pas calculable (voir plus haut). C'est la
   principale limite, et elle est structurelle.
+- Les **bilans de la BRVM** sont lus dans les PDF déposés par les émetteurs,
+  et 26 des 28 sociétés que le secteur ne tranche pas d'emblée sont
+  couvertes. Les deux dernières — NEI-CEDA et TotalEnergies Marketing
+  Sénégal — publient un bilan **en image** : la page ne porte aucune
+  couche de texte, rien n'y est lisible sans reconnaissance optique de
+  caractères, et deviner des chiffres n'est pas une option ici. Elles
+  restent « à vérifier ».
+- Les comptes lus ne sont pas tous du dernier exercice. SODECI publie ses
+  états 2025 dans une police sans table de correspondance, illisible ; son
+  dernier bilan exploitable est celui de 2022. La date d'arrêté est
+  affichée sur chaque fiche, précisément pour que l'ancienneté se voie.
+- **Casablanca** n'est toujours pas couverte, et la source le dit mal : elle
+  répond « Too Many Requests » là où elle devrait répondre « symbole
+  inconnu », ce qui donne l'illusion d'une place récupérable en réessayant.
+  Tunis, Lagos, Mascate et Manama sont dans le même cas.
 - Le **Dow Jones** rapporte les montants à la capitalisation *moyenne sur
   24 mois* ; nous utilisons celle du jour. Sur une valeur volatile, le
   verdict peut différer de l'indice officiel.
 - La ligne « trésorerie et placements » exclut les **titres de
   participation** classés disponibles à la vente, qui ne portent pas
   intérêt. Conservateur pour certaines sociétés, discutable pour d'autres.
-- La classification sectorielle de Yahoo est **grossière**.
+- La classification sectorielle de Yahoo est **grossière**, et **absente**
+  au Caire et à Karachi.
+- L'assiette zakatable de long terme est **approchée** par la part de
+  trésorerie et de créances au bilan. L'AAOIFI recommande d'y ajouter les
+  stocks, que Yahoo ne publie pas. L'approximation est signalée sur chaque
+  ligne du calculateur.
 
 ## Avertissement
 

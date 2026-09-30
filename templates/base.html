@@ -3,43 +3,177 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="dark light">
+<meta name="color-scheme" content="light dark">
 <title>{% block titre %}Tayyib{% endblock %} — Tayyib</title>
-<meta name="description" content="Le screener boursier halal de la place de Paris. Standards AAOIFI, Dow Jones et MSCI, calculs affichés, sources datées.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230c0f14'/%3E%3Cpath d='M9 17.5l4.5 4.5L23 12' stroke='%2335d39a' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta name="description" content="{% block description %}Le screener boursier halal du monde entier, en français. Standards AAOIFI, Dow Jones et MSCI, calculs affichés, sources datées.{% endblock %}">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230c0f14'/%3E%3Cpath d='M9 17.5l4.5 4.5L23 12' stroke='%2300a37a' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
-<header class="entete">
-  <a class="marque" href="/">
-    <svg class="marque-logo" viewBox="0 0 32 32" aria-hidden="true">
-      <rect width="32" height="32" rx="8"/>
-      <path d="M9 17.5l4.5 4.5L23 12" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <span class="marque-nom">Tayyib</span>
-  </a>
-  <nav class="nav">
-    <a href="/" class="{% if request.endpoint == 'accueil' %}on{% endif %}">Screener</a>
-    <a href="/methodologie" class="{% if request.endpoint == 'methodologie' %}on{% endif %}">Méthodologie</a>
-  </nav>
-</header>
+<div class="entete-bande">
+  <header class="entete">
+    <a class="marque" href="{{ url_for('accueil') }}">
+      <svg class="marque-logo" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="9"/>
+        <path d="M9 17.5l4.5 4.5L23 12" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="marque-nom">Tayyib<sup>halal</sup></span>
+    </a>
+
+    <div class="recherche-globale">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5" stroke-linecap="round"/>
+      </svg>
+      <input class="rg-champ" id="rg" type="search" autocomplete="off" role="combobox"
+             aria-expanded="false" aria-controls="rg-resultats"
+             placeholder="Rechercher une valeur, une place, un secteur…">
+      <kbd class="rg-raccourci">/</kbd>
+      <div class="rg-resultats" id="rg-resultats" role="listbox" hidden></div>
+    </div>
+
+    <nav class="nav">
+      <a href="{{ url_for('accueil') }}" class="{% if request.endpoint == 'accueil' %}on{% endif %}">Screener</a>
+      <a href="{{ url_for('analyses') }}" class="{% if request.endpoint == 'analyses' %}on{% endif %}">Analyses</a>
+      <a href="{{ url_for('actualites') }}" class="{% if request.endpoint == 'actualites' %}on{% endif %}">Actualités</a>
+      <a href="{{ url_for('portefeuille') }}" class="{% if request.endpoint == 'portefeuille' %}on{% endif %}">Portefeuille</a>
+      <a href="{{ url_for('suivi') }}" class="{% if request.endpoint == 'suivi' %}on{% endif %}">Suivi</a>
+      {#- Purification, Zakat, les sukuk et les calculateurs se rejoignent sous
+          « Outils » : huit onglets ne se lisent plus, ils se subissent. -#}
+      <a href="{{ url_for('outils') }}"
+         class="{% if request.endpoint in ('outils', 'purification', 'zakat', 'sukuk') %}on{% endif %}">Outils</a>
+      <a href="{{ url_for('methodologie') }}" class="{% if request.endpoint == 'methodologie' %}on{% endif %}">Méthodologie</a>
+    </nav>
+  </header>
+</div>
 
 {% block contenu %}{% endblock %}
 
 <footer class="pied">
-  <p class="avertissement">
-    <strong>Tayyib est un outil d'information, pas un conseil en investissement.</strong>
-    Les verdicts sont le résultat mécanique d'un standard de screening appliqué à
-    des données publiques ; ils ne constituent ni une recommandation d'achat ou de
-    vente, ni une fatwa. Pour une décision engageant votre patrimoine ou votre
-    religion, consultez respectivement un conseiller financier agréé et un savant
-    qualifié.
-  </p>
-  <p class="pied-liens">
-    Données&nbsp;: Yahoo Finance · <a href="/methodologie">Méthodologie et limites</a>
-  </p>
+  <div class="pied-in">
+    <p class="avertissement">
+      <strong>Tayyib est un outil d'information, pas un conseil en investissement.</strong>
+      Les verdicts sont le résultat mécanique d'un standard de screening appliqué à
+      des données publiques ; ils ne constituent ni une recommandation d'achat ou de
+      vente, ni une fatwa. Pour une décision engageant votre patrimoine ou votre
+      religion, consultez respectivement un conseiller financier agréé et un savant
+      qualifié.
+    </p>
+    <p class="pied-liens">
+      <span>Données&nbsp;: Yahoo Finance · presse francophone</span>
+      <a href="{{ url_for('methodologie') }}">Méthodologie et limites</a>
+      <a href="{{ url_for('methodologie') }}#couverture">Places couvertes</a>
+      <a href="{{ url_for('purification') }}">Purification</a>
+      <a href="{{ url_for('zakat') }}">Zakat</a>
+      {% for code, l in langues.items() %}
+        {% if code != lang %}
+          <a href="?lang={{ code }}"><span class="pays">{{ l.code_pays }}</span> {{ l.nom }}</a>
+        {% endif %}
+      {% endfor %}
+    </p>
+  </div>
 </footer>
+
+<script>
+// Recherche globale. L'index entier est chargé une fois puis filtré dans le
+// navigateur : chercher ne doit pas coûter un aller-retour réseau par frappe.
+(function () {
+  var champ = document.getElementById('rg'),
+      boite = document.getElementById('rg-resultats'),
+      entrees = null, resultats = [], actif = -1;
+
+  var TYPES = {valeur: 'Valeur', place: 'Place', secteur: 'Secteur', page: 'Page'};
+
+  function charge() {
+    if (entrees) return Promise.resolve(entrees);
+    return fetch('/api/recherche.json')
+      .then(function (r) { return r.json(); })
+      .then(function (d) { entrees = d.entrees; return entrees; })
+      .catch(function () { entrees = []; return entrees; });
+  }
+
+  // Les clés de l'index sont déjà dépouillées de leurs accents côté
+  // serveur ; la saisie doit l'être identiquement, sinon « hermes » ne
+  // rejoindrait jamais « Hermès ».
+  function sansAccents(t) {
+    return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+
+  function cherche(terme) {
+    terme = sansAccents(terme.trim());
+    if (!terme) return [];
+    // Un début de mot vaut mieux qu'une occurrence au milieu : « ora »
+    // doit proposer Orange avant Sonatel. À rang égal, la plus grosse
+    // capitalisation passe devant.
+    var debut = [], milieu = [];
+    for (var i = 0; i < entrees.length && debut.length + milieu.length < 400; i++) {
+      var pos = entrees[i].cle.indexOf(terme);
+      if (pos === 0 || (pos > 0 && entrees[i].cle[pos - 1] === ' ')) debut.push(entrees[i]);
+      else if (pos > 0) milieu.push(entrees[i]);
+    }
+    var tri = function (a, b) { return b.poids - a.poids; };
+    return debut.sort(tri).concat(milieu.sort(tri)).slice(0, 12);
+  }
+
+  function rend() {
+    if (!resultats.length) {
+      boite.innerHTML = champ.value.trim()
+        ? '<p class="rg-vide">Aucun résultat pour « ' + champ.value.trim() + ' »</p>' : '';
+      boite.hidden = !champ.value.trim();
+      champ.setAttribute('aria-expanded', String(!boite.hidden));
+      return;
+    }
+    boite.innerHTML = resultats.map(function (e, i) {
+      return '<a class="rg-item' + (i === actif ? ' actif' : '') + '" role="option" href="' + e.url + '">' +
+        '<span class="rg-corps"><span class="rg-nom"></span>' +
+        '<span class="rg-detail"></span></span>' +
+        '<span class="rg-type t-' + e.type + '">' + TYPES[e.type] + '</span></a>';
+    }).join('');
+    // Les libellés viennent de la source : on les pose en texte, jamais en HTML.
+    boite.querySelectorAll('.rg-item').forEach(function (el, i) {
+      el.querySelector('.rg-nom').textContent = resultats[i].libelle;
+      el.querySelector('.rg-detail').textContent = resultats[i].detail || '';
+    });
+    boite.hidden = false;
+    champ.setAttribute('aria-expanded', 'true');
+  }
+
+  champ.addEventListener('input', function () {
+    charge().then(function () {
+      resultats = cherche(champ.value);
+      actif = resultats.length ? 0 : -1;
+      rend();
+    });
+  });
+
+  champ.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!resultats.length) return;
+      actif = (actif + (e.key === 'ArrowDown' ? 1 : -1) + resultats.length) % resultats.length;
+      rend();
+    } else if (e.key === 'Enter' && actif >= 0 && resultats[actif]) {
+      e.preventDefault();
+      window.location.href = resultats[actif].url;
+    } else if (e.key === 'Escape') {
+      champ.value = ''; resultats = []; rend(); champ.blur();
+    }
+  });
+
+  champ.addEventListener('focus', charge);
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.recherche-globale')) { boite.hidden = true; }
+  });
+
+  // « / » met le curseur dans la recherche, sauf si l'on est déjà en train
+  // de saisir ailleurs.
+  document.addEventListener('keydown', function (e) {
+    var dans = document.activeElement;
+    var saisie = dans && (dans.tagName === 'INPUT' || dans.tagName === 'TEXTAREA' || dans.tagName === 'SELECT');
+    if (e.key === '/' && !saisie) { e.preventDefault(); champ.focus(); }
+  });
+})();
+</script>
 
 </body>
 </html>
