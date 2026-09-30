@@ -1219,6 +1219,9 @@ td.depasse { color: var(--rouge); }
   color: var(--texte-faible); text-transform: uppercase; white-space: nowrap;
 }
 
+.t-sukuk { min-width: 880px; }
+.t-sukuk td, .t-sukuk th { white-space: nowrap; padding-left: 12px; padding-right: 12px; }
+
 .t-zakat { min-width: 780px; }
 .t-zakat td, .t-zakat th { white-space: nowrap; padding-left: 12px; padding-right: 12px; }
 .t-seuils { min-width: 620px; }
