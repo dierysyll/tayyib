@@ -167,10 +167,16 @@ Ajouter une valeur : un symbole dans la place correspondante de
 
 ## Lancer
 
-Tayyib tourne **sur votre machine**, et nulle part ailleurs. Ce n'est pas une
-limite en attendant mieux : le site promet à son lecteur que son portefeuille
-et sa zakat ne quittent pas son navigateur, et il n'y a pas de façon plus
-simple de tenir cette promesse que de n'avoir aucun serveur.
+Deux façons, qui servent le même code.
+
+**Sur Render**, déployé depuis la branche `main` (voir `render.yaml`). Le build
+collecte l'univers puis relit les états financiers d'Abidjan ; le disque de
+Render étant effacé à chaque déploiement, tout le cache y est reconstruit. Le
+portefeuille, la zakat et la purification ne quittent pas pour autant le
+navigateur du lecteur : ils vivent dans son stockage local, le serveur n'en
+voit rien.
+
+**En local**, pour travailler dessus :
 
 ```bash
 python -m venv .venv && .venv/bin/pip install -r requirements.txt
@@ -210,7 +216,10 @@ a besoin d'une tâche planifiée :
 
 Pour la même raison, cette série ne vit pas dans `cache/`, qui est ignoré par
 git : elle est écrite dans `data/cours_brvm.json`, versionnée avec le code.
-Quelques kilo-octets, mais les seuls que rien ne permettrait de retrouver.
+C'est aussi ce qui la fait arriver sur Render, dont le disque ne garde rien
+d'un déploiement à l'autre : la série publiée est celle du dernier `git push`.
+La tâche locale l'allonge chaque jour ; il faut la pousser pour que le site
+en ligne en profite.
 
 ## Limites connues
 

@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: tayyib
+    runtime: python
+    plan: free
+    # Le cache de l'univers est construit au build : les fondamentaux ne
+    # bougent qu'une fois par trimestre, et interroger Yahoo à chaque
+    # requête serait à la fois lent et vite bloqué (HTTP 429).
+    #
+    # Deux passes. La première collecte l'univers entier, cours d'Abidjan
+    # et sukuk compris. La seconde relit les états financiers déposés à la
+    # BRVM : sur un disque neuf, sans elle, les valeurs d'Abidjan n'auraient
+    # aucun bilan, et vingt-six verdicts retomberaient à « à vérifier ».
+    #
+    # La série de cours d'Abidjan, elle, n'est pas reconstruite ici : elle
+    # vit dans `data/cours_brvm.json`, versionnée, et arrive avec le code.
+    # Le disque de Render étant effacé à chaque déploiement, c'est la seule
+    # façon qu'elle survive.
+    #
+    # Si Yahoo limite le débit depuis les adresses de l'hébergeur, le build
+    # reste vert et l'application démarre avec ce qu'elle a pu collecter, en
+    # l'annonçant plutôt qu'en tombant. Relancer le déploiement suffit alors.
+    buildCommand: >-
+      pip install -r requirements.txt &&
+      (python refresh.py || true) &&
+      (python refresh.py --brvm-bilans || true)
+    startCommand: "gunicorn app:app"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.6"
